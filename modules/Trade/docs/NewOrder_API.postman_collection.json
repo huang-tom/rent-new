@@ -1,0 +1,684 @@
+{
+  "info": {
+    "_postman_id": "b2c3d4e5-f6a7-8901-bcde-neworder00001",
+    "name": "新订单模块 API（购买 + 租赁）",
+    "description": "后台 `manage/trade` 新购买订单 / 新租赁订单接口（与旧 Trade 订单隔离）。\n\n---\n\n## 通用说明\n\n| 项 | 说明 |\n|----|------|\n| 前缀 | `{{baseUrl}}/manage/trade` |\n| 鉴权 | 需登录（middleware `auth`），Query 传 `api_token` 或按项目约定传 Token |\n| 统一响应外壳 | `{ status, code, msg, data }` |\n| 列表分页（转换后） | `items` 列表、`page` 当前页、`records` 总条数、`size` 每页条数、`total` 总页数 |\n| 时间格式 | `datetime`：`YYYY-MM-DD HH:mm:ss`；日期：`YYYY-MM-DD` |\n| 建单用户 | `user_id` 取当前登录用户，不另建用户表 |\n| 客服备注 | 写主表 `service_remark`，覆盖更新 |\n| 标签 | 人工输入 `tag_name`，仅绑当前订单 |\n\n### 统一响应外壳字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| status | int | HTTP/业务状态，成功一般为 200 |\n| code | int | 业务码，成功一般为 200 |\n| msg | string | 提示文案，成功一般为「操作成功」 |\n| data | mixed | 业务数据；失败时可能为 null 或错误信息 |\n\n### 列表分页字段（data 层）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 当前页数据列表 |\n| page | int | 当前页码，从 1 开始 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |\n\n### 购买订单状态 `order_status`\n\n| 值 | 文案 order_status_text |\n|----|------------------------|\n| 0 | 待支付 |\n| 1 | 已支付 |\n| 2 | 已发货 |\n| 3 | 已完成 |\n| 4 | 已退款 |\n\n### 租赁订单状态 `order_status`\n\n| 值 | 文案 order_status_text |\n|----|------------------------|\n| 0 | 待支付 |\n| 1 | 已支付 |\n| 2 | 已发货 |\n| 3 | 租赁中 |\n| 4 | 已归还 |\n| 5 | 已买断 |\n| 6 | 已退款 |\n\n### 购买订单类型 `order_type`\n\n| 值 | 说明 |\n|----|------|\n| 1 | 购买订单（本模块固定；租赁走另表） |\n\n### 软删除 `is_deleted`\n\n| 值 | 说明 |\n|----|------|\n| 0 | 正常（列表仅返回此项） |\n| 1 | 已删除 |\n\n### 租赁业务操作类型 `ops[].op_type`\n\n| 值 | 说明 |\n|----|------|\n| 1 | 退租 / 提前归还 |\n| 2 | 续租 |\n| 3 | 买断 |\n\n### 单号规则\n\n| 类型 | 前缀 | 示例 |\n|------|------|------|\n| 购买 | PO | `PO-20260924-1` |\n| 租赁 | RO | `RO-20260924-1` |\n\n### 集合变量\n\n| 变量 | 说明 |\n|------|------|\n| baseUrl | 如 `http://127.0.0.1:8000` |\n| api_token | 登录 Token |\n| order_id | 购买订单调试 ID |\n| rent_order_id | 租赁订单调试 ID |\n| tag_id | 标签调试 ID |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "api_token", "value": "" },
+    { "key": "order_id", "value": "1" },
+    { "key": "rent_order_id", "value": "1" },
+    { "key": "tag_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. 购买订单（newOrder）",
+      "description": "路径前缀：`/manage/trade/newOrder`\n\n状态枚举：0待支付 / 1已支付 / 2已发货 / 3已完成 / 4已退款",
+      "item": [
+        {
+          "name": "购买订单列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/list?api_token={{api_token}}&page=1&size=20&keyword=&order_source=&order_status=&order_time_start=&order_time_end=",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "list"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token，必填（鉴权）" },
+                { "key": "page", "value": "1", "description": "页码，从 1 开始，默认按框架分页" },
+                { "key": "size", "value": "20", "description": "每页条数" },
+                { "key": "keyword", "value": "", "description": "模糊搜索：订单号 / 买家留言 / 用户昵称 / 用户手机 / 商品名称", "disabled": true },
+                { "key": "order_source", "value": "", "description": "下单来源渠道，精确匹配，如：微信小程序", "disabled": true },
+                { "key": "order_status", "value": "", "description": "订单状态：0待支付;1已支付;2已发货;3已完成;4已退款", "disabled": true },
+                { "key": "order_time_start", "value": "", "description": "下单时间起，datetime，如 2026-09-01 00:00:00", "disabled": true },
+                { "key": "order_time_end", "value": "", "description": "下单时间止，datetime", "disabled": true }
+              ]
+            },
+            "description": "## 购买订单列表\n\n`GET /manage/trade/newOrder/list`\n\n仅返回 `is_deleted=0` 的订单，按 `order_id` 倒序。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| page | int | 否 | 当前页码，从 1 开始 |\n| size | int | 否 | 每页条数 |\n| keyword | string | 否 | 模糊匹配：订单号 `order_number`、买家留言 `buyer_message`、用户昵称/手机、商品名称 |\n| order_source | string | 否 | 下单来源渠道，精确匹配（自由文案，如「微信小程序」） |\n| order_status | int | 否 | 订单状态。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`已完成 / `4`已退款 |\n| order_time_start | datetime | 否 | 下单时间 ≥ 该值 |\n| order_time_end | datetime | 否 | 下单时间 ≤ 该值 |\n\n### 返回 data（分页外壳）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 订单列表，元素见下表 |\n| page | int | 当前页 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |\n\n### 返回 data.items[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 订单主键 ID |\n| order_number | string | 订单号，前缀 `PO-` |\n| order_type | int | 订单类型。枚举：`1`购买 |\n| order_source | string | 下单来源渠道文案 |\n| order_store_name | string | 下单门店名称 |\n| fulfill_warehouse_code | string | 履约分仓编码 |\n| fulfill_warehouse_name | string | 履约仓库名称 |\n| user_id | int | 下单用户 ID（account_user_base） |\n| order_status | int | 状态。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`已完成 / `4`已退款 |\n| order_status_text | string | 状态文案（由 order_status 映射） |\n| delivery_type | string | 配送方式文案（如门店配送） |\n| express_no | string | 快递单号，空则前端可显示 — |\n| buyer_message | string | 买家留言 |\n| service_remark | string | 客服备注 |\n| expect_delivery_time | datetime/null | 期望送达时间 |\n| expect_return_time | datetime/null | 期望归还时间 |\n| product_amount | decimal | 商品金额合计 |\n| freight_amount | decimal | 运费 |\n| deposit_amount | decimal | 押金 |\n| payable_amount | decimal | 应付金额 |\n| paid_amount | decimal | 实付金额 |\n| points_num | int | 积分数量（占位，不计算） |\n| points_amount | decimal | 积分抵扣金额（占位） |\n| pay_method | string | 支付方式文案 |\n| order_time | datetime/null | 下单时间 |\n| pay_time | datetime/null | 付款时间 |\n| assign_warehouse_time | datetime/null | 分仓时间 |\n| is_deleted | int | 是否删除。枚举：`0`否 / `1`是（列表恒为 0） |\n| add_time | datetime/null | 创建时间 |\n| update_time | datetime/null | 更新时间 |\n| user_name | string | 用户昵称（联表补全） |\n| user_mobile | string | 用户手机（联表补全） |\n| item_summary | string | 商品摘要，如「商品A x 1；商品B x 2」 |\n| item_quantity | int | 明细数量合计 |\n| tags | array | 标签列表，见 tags[] |\n\n### 返回 data.items[].tags[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| tag_id | int | 标签 ID |\n| order_id | int | 所属订单 ID |\n| tag_name | string | 标签名（人工输入） |\n| add_time | datetime | 添加时间 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"items\": [\n      {\n        \"order_id\": 1,\n        \"order_number\": \"PO-20260924-1\",\n        \"order_type\": 1,\n        \"order_source\": \"微信小程序\",\n        \"order_store_name\": \"海淀门店商城\",\n        \"fulfill_warehouse_code\": \"HD01\",\n        \"fulfill_warehouse_name\": \"海淀门店\",\n        \"user_id\": 90017,\n        \"order_status\": 1,\n        \"order_status_text\": \"已支付\",\n        \"delivery_type\": \"门店配送\",\n        \"express_no\": \"\",\n        \"buyer_message\": \"请上门安装\",\n        \"service_remark\": \"\",\n        \"product_amount\": \"450.00\",\n        \"freight_amount\": \"0.00\",\n        \"deposit_amount\": \"0.00\",\n        \"payable_amount\": \"450.00\",\n        \"paid_amount\": \"450.00\",\n        \"points_num\": 0,\n        \"points_amount\": \"0.00\",\n        \"pay_method\": \"微信支付\",\n        \"order_time\": \"2026-09-24 14:10:00\",\n        \"pay_time\": \"2026-09-24 14:10:40\",\n        \"user_name\": \"王秀英\",\n        \"user_mobile\": \"13912348842\",\n        \"item_summary\": \"电动轮椅 x 1\",\n        \"item_quantity\": 1,\n        \"tags\": [{ \"tag_id\": 1, \"order_id\": 1, \"tag_name\": \"上门安装\", \"add_time\": \"2026-09-24 15:00:00\" }]\n      }\n    ],\n    \"page\": 1,\n    \"records\": 1,\n    \"size\": 20,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "购买订单详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/get?api_token={{api_token}}&order_id={{order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "get"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" },
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID，必填" }
+              ]
+            },
+            "description": "## 购买订单详情\n\n`GET /manage/trade/newOrder/get`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单主键 ID |\n\n### 返回 data 顶层\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order | object | 订单主表 + `order_status_text` |\n| user | object | 用户信息（可能为空对象） |\n| items | array | 商品明细 |\n| address | object/null | 收货地址；无地址时为 null |\n| tags | array | 标签列表 |\n| refunds | array | 退款记录，新→旧 |\n| logs | array | 操作日志，新→旧 |\n| timeline | array | 流转时间线节点 |\n\n### 返回 data.order 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 订单 ID |\n| order_number | string | 订单号 PO- |\n| order_type | int | 类型。枚举：`1`购买 |\n| order_source | string | 下单来源 |\n| order_store_name | string | 下单门店 |\n| fulfill_warehouse_code | string | 履约仓编码 |\n| fulfill_warehouse_name | string | 履约仓名称 |\n| user_id | int | 用户 ID |\n| order_status | int | 状态。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`已完成 / `4`已退款 |\n| order_status_text | string | 状态文案 |\n| delivery_type | string | 配送方式 |\n| express_no | string | 快递单号 |\n| buyer_message | string | 买家留言 |\n| service_remark | string | 客服备注 |\n| expect_delivery_time | datetime/null | 期望送达 |\n| expect_return_time | datetime/null | 期望归还 |\n| product_amount | decimal | 商品金额 |\n| freight_amount | decimal | 运费 |\n| deposit_amount | decimal | 押金 |\n| payable_amount | decimal | 应付 |\n| paid_amount | decimal | 实付 |\n| points_num | int | 积分数量（占位） |\n| points_amount | decimal | 积分金额（占位） |\n| pay_method | string | 支付方式文案 |\n| order_time | datetime/null | 下单时间 |\n| pay_time | datetime/null | 付款时间 |\n| assign_warehouse_time | datetime/null | 分仓时间 |\n| is_deleted | int | `0`否 / `1`是 |\n| add_time | datetime/null | 创建时间 |\n| update_time | datetime/null | 更新时间 |\n\n### 返回 data.user 字段（来自 account_user_info，常见）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| user_id | int | 用户 ID |\n| user_nickname | string | 昵称 |\n| user_mobile | string | 手机号 |\n| （其他） | mixed | 以用户表实际字段为准 |\n\n### 返回 data.items[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| item_id | int | 明细 ID |\n| order_id | int | 订单 ID |\n| product_id | int | 商品 ID |\n| product_name | string | 商品名称快照 |\n| product_number | string | 商品编号快照 |\n| product_image | string | 商品图 URL |\n| spec_name | string | 规格名称 |\n| unit_price | decimal | 单价 |\n| quantity | int | 数量 |\n| subtotal | decimal | 小计 |\n| stock_out_qty | int | 出库数 |\n| add_time | datetime | 创建时间 |\n\n### 返回 data.address 字段（无则 null）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| address_id | int | 地址 ID |\n| order_id | int | 订单 ID |\n| consignee | string | 收货人 |\n| consignee_mobile | string | 收货电话 |\n| province | string | 省 |\n| city | string | 市 |\n| district | string | 区 |\n| address_detail | string | 详细地址 |\n| address_full | string | 完整地址文案 |\n| add_time | datetime | 创建时间 |\n\n### 返回 data.tags[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| tag_id | int | 标签 ID |\n| order_id | int | 订单 ID |\n| tag_name | string | 标签名 |\n| add_time | datetime | 添加时间 |\n\n### 返回 data.refunds[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| refund_id | int | 退款记录 ID |\n| order_id | int | 订单 ID |\n| refund_amount | decimal | 退款金额 |\n| refund_reason | string | 退款原因 |\n| operator_name | string | 操作人 |\n| add_time | datetime | 退款时间 |\n\n### 返回 data.logs[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| log_id | int | 日志 ID |\n| order_id | int | 订单 ID |\n| log_content | string | 日志内容 |\n| operator_name | string | 操作人 |\n| add_time | datetime | 记录时间 |\n\n### 返回 data.timeline[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| key | string | 节点标识。枚举：`submit`提交订单 / `pay`支付完成 / `warehouse`仓库已分配 / `ship`商家发货 / `receive`确认收货 / `done`订单完成 |\n| title | string | 节点标题文案 |\n| time | datetime/null | 节点时间；未发生为 null |\n| done | bool | 是否已完成（有 time 则为 true） |\n| current | bool | 是否当前节点 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"order\": {\n      \"order_id\": 1,\n      \"order_number\": \"PO-20260924-1\",\n      \"order_type\": 1,\n      \"order_status\": 1,\n      \"order_status_text\": \"已支付\",\n      \"product_amount\": \"450.00\",\n      \"payable_amount\": \"450.00\",\n      \"paid_amount\": \"450.00\",\n      \"order_time\": \"2026-09-24 14:10:00\",\n      \"pay_time\": \"2026-09-24 14:10:40\"\n    },\n    \"user\": { \"user_id\": 90017, \"user_nickname\": \"王秀英\", \"user_mobile\": \"13912348842\" },\n    \"items\": [{ \"item_id\": 1, \"product_name\": \"电动轮椅\", \"unit_price\": \"450.00\", \"quantity\": 1, \"subtotal\": \"450.00\" }],\n    \"address\": { \"consignee\": \"王秀英\", \"consignee_mobile\": \"13912348842\", \"address_full\": \"北京市海淀区中关村街道\" },\n    \"tags\": [],\n    \"refunds\": [],\n    \"logs\": [{ \"log_id\": 1, \"log_content\": \"创建购买订单\", \"operator_name\": \"系统\", \"add_time\": \"2026-09-24 14:10:00\" }],\n    \"timeline\": [\n      { \"key\": \"submit\", \"title\": \"提交订单\", \"time\": \"2026-09-24 14:10:00\", \"done\": true, \"current\": false },\n      { \"key\": \"pay\", \"title\": \"支付完成\", \"time\": \"2026-09-24 14:10:40\", \"done\": true, \"current\": true },\n      { \"key\": \"warehouse\", \"title\": \"仓库已分配\", \"time\": null, \"done\": false, \"current\": false },\n      { \"key\": \"ship\", \"title\": \"商家发货\", \"time\": null, \"done\": false, \"current\": false },\n      { \"key\": \"receive\", \"title\": \"确认收货\", \"time\": null, \"done\": false, \"current\": false },\n      { \"key\": \"done\", \"title\": \"订单完成\", \"time\": null, \"done\": false, \"current\": false }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "新增购买订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_source\": \"微信小程序\",\n  \"order_store_name\": \"海淀门店商城\",\n  \"fulfill_warehouse_code\": \"HD01\",\n  \"fulfill_warehouse_name\": \"海淀门店\",\n  \"order_status\": 1,\n  \"delivery_type\": \"门店配送\",\n  \"express_no\": \"\",\n  \"buyer_message\": \"请上门安装\",\n  \"service_remark\": \"\",\n  \"expect_delivery_time\": \"2026-09-25 10:00:00\",\n  \"expect_return_time\": null,\n  \"freight_amount\": 0,\n  \"deposit_amount\": 0,\n  \"payable_amount\": 450,\n  \"paid_amount\": 450,\n  \"points_num\": 0,\n  \"points_amount\": 0,\n  \"pay_method\": \"微信支付\",\n  \"order_time\": \"2026-09-24 14:10:00\",\n  \"pay_time\": \"2026-09-24 14:10:40\",\n  \"operator_name\": \"系统\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"product_name\": \"电动轮椅\",\n      \"product_number\": \"SKU-WL-2008\",\n      \"product_image\": \"https://example.com/a.jpg\",\n      \"spec_name\": \"标准续航\",\n      \"unit_price\": 450,\n      \"quantity\": 1,\n      \"subtotal\": 450,\n      \"stock_out_qty\": 0\n    }\n  ],\n  \"address\": {\n    \"consignee\": \"王秀英\",\n    \"consignee_mobile\": \"13912348842\",\n    \"province\": \"北京市\",\n    \"city\": \"北京市\",\n    \"district\": \"海淀区\",\n    \"address_detail\": \"中关村街道\",\n    \"address_full\": \"北京市海淀区中关村街道\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/add?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "add"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 新增购买订单\n\n`POST /manage/trade/newOrder/add`\n\n- 自动生成 `order_number`（`PO-日期-序号`）\n- `user_id` 强制取当前登录用户（忽略入参）\n- `order_type` 固定为 `1`\n- 未传 `payable_amount`：按 `商品金额合计 + freight_amount + deposit_amount`\n- 未传 `paid_amount`：等于应付\n- `order_status` 默认 `1`；若为已支付且未传 `pay_time`，自动补当前时间\n- 仓编码/名称任一有值：写入 `assign_warehouse_time`\n\n### 请求字段（主表）\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | Query 鉴权 Token |\n| items | array | 是 | 商品明细，至少 1 条；可为 JSON 数组或 JSON 字符串 |\n| address | object | 否 | 收货地址；不传则不写地址表 |\n| order_source | string | 否 | 下单来源渠道文案 |\n| order_store_name | string | 否 | 下单门店名称 |\n| fulfill_warehouse_code | string | 否 | 履约分仓编码 |\n| fulfill_warehouse_name | string | 否 | 履约仓库名称 |\n| order_status | int | 否 | 默认 `1`。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`已完成 / `4`已退款 |\n| delivery_type | string | 否 | 配送方式文案 |\n| express_no | string | 否 | 快递单号 |\n| buyer_message | string | 否 | 买家留言，≤500 |\n| service_remark | string | 否 | 客服备注，≤1000 |\n| expect_delivery_time | datetime | 否 | 期望送达；支持时间戳或日期字符串 |\n| expect_return_time | datetime | 否 | 期望归还 |\n| freight_amount | decimal | 否 | 运费，默认 0 |\n| deposit_amount | decimal | 否 | 押金，默认 0 |\n| payable_amount | decimal | 否 | 应付；不传则自动算 |\n| paid_amount | decimal | 否 | 实付；不传则等于应付 |\n| points_num | int | 否 | 积分数量（占位，不计算），默认 0 |\n| points_amount | decimal | 否 | 积分抵扣金额（占位），默认 0 |\n| pay_method | string | 否 | 支付方式文案 |\n| order_time | datetime | 否 | 下单时间；不传用当前时间 |\n| pay_time | datetime | 否 | 付款时间；已支付且未传则自动补 |\n| operator_name | string | 否 | 写日志的操作人，默认「系统」 |\n\n### 请求字段 items[]\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| product_id | int | 否 | 商品 ID |\n| product_name | string | 建议 | 商品名称快照 |\n| product_number | string | 否 | 商品编号快照 |\n| product_image | string | 否 | 商品图 URL |\n| spec_name | string | 否 | 规格 |\n| unit_price | decimal | 建议 | 单价 |\n| quantity | int | 否 | 数量，默认 1，最小按 1 处理 |\n| subtotal | decimal | 否 | 小计；不传 = 单价×数量 |\n| stock_out_qty | int | 否 | 出库数，默认 0 |\n\n### 请求字段 address\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| consignee | string | 否 | 收货人 |\n| consignee_mobile | string | 否 | 收货电话 |\n| province | string | 否 | 省 |\n| city | string | 否 | 市 |\n| district | string | 否 | 区 |\n| address_detail | string | 否 | 详细地址 |\n| address_full | string | 否 | 完整地址；不传则用省市区+详情拼接 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 新建订单 ID |\n| order_number | string | 新建订单号 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"order_id\": 1,\n    \"order_number\": \"PO-20260924-1\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "分配仓库",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID，必填" },
+                { "key": "warehouse_code", "value": "HD01", "description": "分仓编码；与名称不能同时为空" },
+                { "key": "warehouse_name", "value": "海淀门店", "description": "仓库名称；与编码不能同时为空" },
+                { "key": "operator_name", "value": "客服", "description": "操作人，写日志；默认「客服」" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/assignWarehouse?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "assignWarehouse"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 分配仓库\n\n`POST /manage/trade/newOrder/assignWarehouse`\n\n仅保存仓编码 + 名称，并刷新 `assign_warehouse_time`。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| warehouse_code | string | 条件 | 分仓编码；与 warehouse_name 不能同时为空 |\n| warehouse_name | string | 条件 | 仓库名称；与 warehouse_code 不能同时为空 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | 成功为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "添加标签",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID" },
+                { "key": "tag_name", "value": "上门安装", "description": "标签名，人工输入，同单不可重复" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/addTag?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "addTag"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 添加标签\n\n`POST /manage/trade/newOrder/addTag`\n\n人工输入标签，仅绑当前订单；同名不可重复。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| tag_name | string | 是 | 标签名，trim 后不能为空，≤50 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| tag_id | int | 新建标签 ID |\n| order_id | int | 订单 ID |\n| tag_name | string | 标签名 |\n| add_time | datetime | 添加时间 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"tag_id\": 1,\n    \"order_id\": 1,\n    \"tag_name\": \"上门安装\",\n    \"add_time\": \"2026-09-24 15:00:00\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "删除标签",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID" },
+                { "key": "tag_id", "value": "{{tag_id}}", "description": "标签 ID，须属于该订单" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/removeTag?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "removeTag"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 删除标签\n\n`POST /manage/trade/newOrder/removeTag`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| tag_id | int | 是 | 标签 ID；须属于该订单，否则报「标签不存在」 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | 成功为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "客服备注",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID" },
+                { "key": "remark_content", "value": "已电话确认安装时间", "description": "备注内容；也可用 service_remark" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/addRemark?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "addRemark"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 客服备注\n\n`POST /manage/trade/newOrder/addRemark`\n\n覆盖写入主表 `service_remark`。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| remark_content | string | 条件 | 备注内容；为空时可读 `service_remark`；最终 trim 后不能为空 |\n| service_remark | string | 条件 | 与 remark_content 二选一兼容字段 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | 成功为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "退款",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{order_id}}", "description": "订单 ID" },
+                { "key": "refund_amount", "value": "450", "description": "退款金额，须 > 0" },
+                { "key": "refund_reason", "value": "客户取消", "description": "退款原因，必填" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newOrder/refund?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newOrder", "refund"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 退款\n\n`POST /manage/trade/newOrder/refund`\n\n写入退款记录，并将 `order_status` 改为 **`4` 已退款**。已退款订单不可再次退款。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| refund_amount | decimal | 是 | 退款金额，必须 > 0 |\n| refund_reason | string | 是 | 退款原因，trim 后不能为空 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | 成功为 `true` |\n\n### 副作用\n\n| 项 | 说明 |\n|----|------|\n| order_status | 变为 `4`（已退款） |\n| trade_new_order_refund | 新增一条退款记录 |\n| trade_new_order_log | 新增退款日志 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. 租赁订单（newRentOrder）",
+      "description": "路径前缀：`/manage/trade/newRentOrder`\n\n状态枚举：0待支付 / 1已支付 / 2已发货 / 3租赁中 / 4已归还 / 5已买断 / 6已退款\n\nop_type 枚举：1退租 / 2续租 / 3买断",
+      "item": [
+        {
+          "name": "租赁订单列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/list?api_token={{api_token}}&page=1&size=20&keyword=&order_source=&order_status=&rent_days=&order_time_start=&order_time_end=",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "list"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" },
+                { "key": "page", "value": "1", "description": "页码，从 1 开始" },
+                { "key": "size", "value": "20", "description": "每页条数" },
+                { "key": "keyword", "value": "", "description": "订单号/留言/用户昵称手机/商品名或编号", "disabled": true },
+                { "key": "order_source", "value": "", "description": "下单来源，精确匹配", "disabled": true },
+                { "key": "order_status", "value": "", "description": "0待支付;1已支付;2已发货;3租赁中;4已归还;5已买断;6已退款", "disabled": true },
+                { "key": "rent_days", "value": "", "description": "租期天数，整数精确匹配，如 30", "disabled": true },
+                { "key": "order_time_start", "value": "", "description": "下单时间起", "disabled": true },
+                { "key": "order_time_end", "value": "", "description": "下单时间止；仅 YYYY-MM-DD 时自动补 23:59:59", "disabled": true }
+              ]
+            },
+            "description": "## 租赁订单列表\n\n`GET /manage/trade/newRentOrder/list`\n\n仅返回 `is_deleted=0`，按 `order_id` 倒序。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| page | int | 否 | 当前页码，从 1 开始 |\n| size | int | 否 | 每页条数 |\n| keyword | string | 否 | 模糊：订单号、买家留言、用户昵称/手机、商品名称/商品编号 |\n| order_source | string | 否 | 下单来源，精确匹配 |\n| order_status | int | 否 | 状态。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`租赁中 / `4`已归还 / `5`已买断 / `6`已退款 |\n| rent_days | int | 否 | 租期天数，精确匹配主表汇总字段 |\n| order_time_start | datetime | 否 | 下单时间 ≥ |\n| order_time_end | datetime/date | 否 | 下单时间 ≤；若仅 `YYYY-MM-DD` 自动补 `23:59:59` |\n\n### 返回 data（分页外壳）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 订单列表 |\n| page | int | 当前页 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |\n\n### 返回 data.items[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 订单 ID |\n| order_number | string | 订单号，前缀 `RO-` |\n| order_source | string | 下单来源 |\n| order_store_name | string | 下单门店 |\n| fulfill_warehouse_code | string | 履约仓编码 |\n| fulfill_warehouse_name | string | 履约仓名称 |\n| user_id | int | 用户 ID |\n| order_status | int | 状态。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`租赁中 / `4`已归还 / `5`已买断 / `6`已退款 |\n| order_status_text | string | 状态文案 |\n| delivery_type | string | 配送方式 |\n| express_no | string | 快递单号 |\n| buyer_message | string | 买家留言 |\n| service_remark | string | 客服备注 |\n| expect_delivery_time | datetime/null | 期望送达 |\n| expect_return_time | datetime/null | 期望归还 |\n| rent_days | int | 租期天数（汇总） |\n| daily_rent | decimal | 日租金（汇总展示） |\n| product_amount | decimal | 租金金额（商品金额） |\n| freight_amount | decimal | 运费 |\n| deposit_amount | decimal | 押金（冻结） |\n| discount_amount | decimal | 优惠合计（占位） |\n| payable_amount | decimal | 应付金额 |\n| paid_amount | decimal | 实付金额 |\n| points_num | int | 积分数量（占位） |\n| points_amount | decimal | 积分金额（占位） |\n| pay_method | string | 支付方式文案 |\n| equipment_original_price | decimal | 设备原价（买断参考） |\n| buyout_price | decimal | 已买断时的买断价 |\n| buyout_payable | decimal | 买断应付 |\n| order_time | datetime/null | 下单时间 |\n| pay_time | datetime/null | 付款时间 |\n| assign_warehouse_time | datetime/null | 分仓时间 |\n| ship_time | datetime/null | 发货时间 |\n| renting_time | datetime/null | 进入租赁中时间 |\n| return_time | datetime/null | 归还结算时间 |\n| buyout_time | datetime/null | 买断时间 |\n| is_deleted | int | `0`否 / `1`是 |\n| add_time | datetime/null | 创建时间 |\n| update_time | datetime/null | 更新时间 |\n| user_name | string | 用户昵称（补全） |\n| user_mobile | string | 用户手机（补全） |\n| item_summary | string | 商品摘要 |\n| item_quantity | int | 数量合计 |\n| product_name | string | 首条明细商品名（列表展示） |\n| spec_name | string | 首条明细规格 |\n| daily_rent_period_text | string | 展示文案，如「¥15 × 30天」 |\n| tags | array | 标签列表 |\n\n### 返回 data.items[].tags[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| tag_id | int | 标签 ID |\n| order_id | int | 订单 ID |\n| tag_name | string | 标签名 |\n| add_time | datetime | 添加时间 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"items\": [\n      {\n        \"order_id\": 1,\n        \"order_number\": \"RO-20260924-1\",\n        \"order_source\": \"微信小程序\",\n        \"order_store_name\": \"海淀门店商城\",\n        \"fulfill_warehouse_name\": \"海淀门店\",\n        \"order_status\": 3,\n        \"order_status_text\": \"租赁中\",\n        \"user_name\": \"王秀英\",\n        \"user_mobile\": \"13912348842\",\n        \"product_name\": \"电动轮椅 (轻便折叠款)\",\n        \"spec_name\": \"标准续航\",\n        \"item_quantity\": 1,\n        \"daily_rent\": \"15.00\",\n        \"rent_days\": 30,\n        \"daily_rent_period_text\": \"¥15 × 30天\",\n        \"deposit_amount\": \"300.00\",\n        \"product_amount\": \"450.00\",\n        \"payable_amount\": \"705.00\",\n        \"order_time\": \"2026-09-24 14:10:00\",\n        \"pay_time\": \"2026-09-24 14:10:00\",\n        \"tags\": []\n      }\n    ],\n    \"page\": 1,\n    \"records\": 1,\n    \"size\": 20,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "租赁订单详情",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/get?api_token={{api_token}}&order_id={{rent_order_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "get"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" },
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "租赁订单 ID，必填" }
+              ]
+            },
+            "description": "## 租赁订单详情\n\n`GET /manage/trade/newRentOrder/get`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n\n### 返回 data 顶层\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order | object | 主表 + order_status_text |\n| user | object | 用户信息 |\n| items | array | 租赁商品明细 |\n| address | object/null | 收货地址 |\n| tags | array | 标签 |\n| refunds | array | 退款记录 |\n| ops | array | 退租/续租/买断记录 |\n| repairs | array | 报修记录 |\n| logs | array | 操作日志 |\n| timeline | array | 时间线 |\n\n### 返回 data.order 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 订单 ID |\n| order_number | string | 订单号 RO- |\n| order_source | string | 下单来源 |\n| order_store_name | string | 下单门店 |\n| fulfill_warehouse_code | string | 履约仓编码 |\n| fulfill_warehouse_name | string | 履约仓名称 |\n| user_id | int | 用户 ID |\n| order_status | int | 枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`租赁中 / `4`已归还 / `5`已买断 / `6`已退款 |\n| order_status_text | string | 状态文案 |\n| delivery_type | string | 配送方式 |\n| express_no | string | 快递单号 |\n| buyer_message | string | 买家留言 |\n| service_remark | string | 客服备注 |\n| expect_delivery_time | datetime/null | 期望送达 |\n| expect_return_time | datetime/null | 期望归还 |\n| rent_days | int | 租期天数汇总 |\n| daily_rent | decimal | 日租金汇总 |\n| product_amount | decimal | 租金金额 |\n| freight_amount | decimal | 运费 |\n| deposit_amount | decimal | 押金（冻结） |\n| discount_amount | decimal | 优惠合计（占位） |\n| payable_amount | decimal | 应付 |\n| paid_amount | decimal | 实付 |\n| points_num | int | 积分数量（占位） |\n| points_amount | decimal | 积分金额（占位） |\n| pay_method | string | 支付方式 |\n| equipment_original_price | decimal | 设备原价 |\n| buyout_price | decimal | 买断价 |\n| buyout_payable | decimal | 买断应付 |\n| order_time | datetime/null | 下单时间 |\n| pay_time | datetime/null | 付款时间 |\n| assign_warehouse_time | datetime/null | 分仓时间 |\n| ship_time | datetime/null | 发货时间 |\n| renting_time | datetime/null | 进入租赁中时间 |\n| return_time | datetime/null | 归还结算时间 |\n| buyout_time | datetime/null | 买断时间 |\n| is_deleted | int | `0`否 / `1`是 |\n| add_time | datetime/null | 创建时间 |\n| update_time | datetime/null | 更新时间 |\n\n### 返回 data.items[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| item_id | int | 明细 ID |\n| order_id | int | 订单 ID |\n| product_id | int | 商品 ID |\n| product_name | string | 商品名称 |\n| product_number | string | 商品编号 |\n| product_image | string | 商品图 |\n| spec_name | string | 规格 |\n| daily_rent | decimal | 日租金 |\n| rent_days | int | 租期天数 |\n| rent_start_date | date/null | 起租日 |\n| rent_end_date | date/null | 到期日 |\n| deposit_amount | decimal | 押金 |\n| rent_subtotal | decimal | 租金小计 |\n| discount_amount | decimal | 优惠金额（占位） |\n| quantity | int | 数量 |\n| locked_stock_qty | int | 锁定库存数 |\n| device_asset_no | string | 设备资产编号 |\n| serial_number | string | 序列号 SN |\n| equipment_original_price | decimal | 设备原价 |\n| add_time | datetime | 创建时间 |\n\n### 返回 data.address 字段（无则 null）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| address_id | int | 地址 ID |\n| order_id | int | 订单 ID |\n| consignee | string | 收货人 |\n| consignee_mobile | string | 收货电话 |\n| province | string | 省 |\n| city | string | 市 |\n| district | string | 区 |\n| address_detail | string | 详细地址 |\n| address_full | string | 完整地址 |\n| add_time | datetime | 创建时间 |\n\n### 返回 data.tags[] / refunds[] / logs[]\n\n同购买订单对应结构（tag_id/tag_name；refund_id/refund_amount/refund_reason；log_id/log_content/operator_name/add_time）。\n\n### 返回 data.ops[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| op_id | int | 记录 ID |\n| order_id | int | 订单 ID |\n| op_type | int | 类型。枚举：`1`退租 / `2`续租 / `3`买断 |\n| op_date | date/null | 业务日期（如退租日） |\n| days | int | 天数（已用天数或续租天数） |\n| rent_refund | decimal | 退还租金 |\n| deposit_refund | decimal | 退还/解冻押金 |\n| renew_rent | decimal | 续租租金 |\n| buyout_price | decimal | 买断价 |\n| deposit_offset | decimal | 押金抵扣 |\n| payable_amount | decimal | 本次应付或应退合计 |\n| remark | string | 备注 |\n| operator_name | string | 操作人 |\n| add_time | datetime | 记录时间 |\n\n### 返回 data.repairs[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| repair_id | int | 报修 ID |\n| order_id | int | 订单 ID |\n| fault_type | string | 故障类型（自由文案） |\n| fault_desc | string | 故障描述 |\n| handle_method | string | 处理方式（自由文案，如上门维修） |\n| operator_name | string | 操作人 |\n| add_time | datetime | 报修时间 |\n\n### 返回 data.timeline[] 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| key | string | 节点。枚举：`submit`提交订单 / `pay`支付(含押金) / `warehouse`仓库已分配 / `ship`商家发货 / `renting`租赁中 / `settle`归还结算 |\n| title | string | 节点标题 |\n| time | datetime/null | 节点时间；归还结算取 return_time 或 buyout_time |\n| done | bool | 是否已完成 |\n| current | bool | 是否当前节点 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"order\": {\n      \"order_id\": 1,\n      \"order_number\": \"RO-20260924-1\",\n      \"order_status\": 3,\n      \"order_status_text\": \"租赁中\",\n      \"daily_rent\": \"15.00\",\n      \"rent_days\": 30,\n      \"deposit_amount\": \"300.00\",\n      \"product_amount\": \"450.00\",\n      \"discount_amount\": \"45.00\",\n      \"payable_amount\": \"705.00\"\n    },\n    \"user\": { \"user_id\": 90017, \"user_nickname\": \"王秀英\" },\n    \"items\": [{ \"item_id\": 1, \"product_name\": \"电动轮椅 (轻便折叠款)\", \"daily_rent\": \"15.00\", \"rent_days\": 30, \"rent_start_date\": \"2026-08-18\", \"rent_end_date\": \"2026-09-17\" }],\n    \"address\": { \"consignee\": \"王秀英\", \"address_full\": \"北京市海淀区中关村街道\" },\n    \"tags\": [],\n    \"refunds\": [],\n    \"ops\": [],\n    \"repairs\": [],\n    \"logs\": [],\n    \"timeline\": [\n      { \"key\": \"submit\", \"title\": \"提交订单\", \"done\": true, \"current\": false },\n      { \"key\": \"pay\", \"title\": \"支付(含押金)\", \"done\": true, \"current\": false },\n      { \"key\": \"warehouse\", \"title\": \"仓库已分配\", \"done\": true, \"current\": false },\n      { \"key\": \"ship\", \"title\": \"商家发货\", \"done\": true, \"current\": false },\n      { \"key\": \"renting\", \"title\": \"租赁中\", \"done\": true, \"current\": true },\n      { \"key\": \"settle\", \"title\": \"归还结算\", \"done\": false, \"current\": false }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "新增租赁订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_source\": \"微信小程序\",\n  \"order_store_name\": \"海淀门店商城\",\n  \"fulfill_warehouse_code\": \"HD01\",\n  \"fulfill_warehouse_name\": \"海淀门店\",\n  \"order_status\": 3,\n  \"delivery_type\": \"门店配送\",\n  \"express_no\": \"\",\n  \"buyer_message\": \"老人行动不便，需上门安装调试\",\n  \"service_remark\": \"\",\n  \"expect_delivery_time\": \"2026-08-18 10:00:00\",\n  \"expect_return_time\": \"2026-09-16 18:00:00\",\n  \"freight_amount\": 0,\n  \"deposit_amount\": 300,\n  \"discount_amount\": 45,\n  \"payable_amount\": 705,\n  \"paid_amount\": 705,\n  \"points_num\": 0,\n  \"points_amount\": 0,\n  \"pay_method\": \"微信支付\",\n  \"rent_days\": 30,\n  \"daily_rent\": 15,\n  \"equipment_original_price\": 495,\n  \"ship_time\": \"2026-08-17 15:00:00\",\n  \"renting_time\": \"2026-08-17 15:30:00\",\n  \"operator_name\": \"系统\",\n  \"items\": [\n    {\n      \"product_id\": 1,\n      \"product_name\": \"电动轮椅 (轻便折叠款)\",\n      \"product_number\": \"SKU-WL-2008\",\n      \"product_image\": \"https://example.com/a.jpg\",\n      \"spec_name\": \"标准续航\",\n      \"daily_rent\": 15,\n      \"rent_days\": 30,\n      \"rent_start_date\": \"2026-08-18\",\n      \"rent_end_date\": \"2026-09-17\",\n      \"deposit_amount\": 300,\n      \"rent_subtotal\": 450,\n      \"discount_amount\": 45,\n      \"quantity\": 1,\n      \"locked_stock_qty\": 1,\n      \"device_asset_no\": \"WL-2008-0312\",\n      \"serial_number\": \"SN202608170312\",\n      \"equipment_original_price\": 495\n    }\n  ],\n  \"address\": {\n    \"consignee\": \"王秀英\",\n    \"consignee_mobile\": \"13912348842\",\n    \"province\": \"北京市\",\n    \"city\": \"北京市\",\n    \"district\": \"海淀区\",\n    \"address_detail\": \"中关村街道\",\n    \"address_full\": \"北京市海淀区中关村街道\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/add?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "add"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 新增租赁订单\n\n`POST /manage/trade/newRentOrder/add`\n\n- 自动生成 `order_number`（`RO-`）\n- `user_id` 取当前登录用户\n- 未传 `payable_amount`：按 `租金合计 - 优惠 + 运费 + 押金`\n- `order_status` 默认 `1`；≥已支付且非退款时未传 `pay_time` 会自动补\n- 状态为已发货/租赁中且未传对应时间，会自动补 `ship_time` / `renting_time`\n\n### 请求字段（主表）\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | Query Token |\n| items | array | 是 | 明细，至少 1 条 |\n| address | object | 否 | 收货地址 |\n| order_source | string | 否 | 下单来源 |\n| order_store_name | string | 否 | 下单门店 |\n| fulfill_warehouse_code | string | 否 | 履约仓编码 |\n| fulfill_warehouse_name | string | 否 | 履约仓名称 |\n| order_status | int | 否 | 默认 `1`。枚举：`0`待支付 / `1`已支付 / `2`已发货 / `3`租赁中 / `4`已归还 / `5`已买断 / `6`已退款 |\n| delivery_type | string | 否 | 配送方式 |\n| express_no | string | 否 | 快递单号 |\n| buyer_message | string | 否 | 买家留言 |\n| service_remark | string | 否 | 客服备注 |\n| expect_delivery_time | datetime | 否 | 期望送达 |\n| expect_return_time | datetime | 否 | 期望归还 |\n| rent_days | int | 否 | 主表租期；不传则取明细最大租期 |\n| daily_rent | decimal | 否 | 主表日租金；不传则取明细首个 >0 日租 |\n| freight_amount | decimal | 否 | 运费，默认 0 |\n| deposit_amount | decimal | 否 | 押金；不传则汇总明细押金 |\n| discount_amount | decimal | 否 | 优惠；不传则汇总明细优惠 |\n| payable_amount | decimal | 否 | 应付；不传自动算 |\n| paid_amount | decimal | 否 | 实付；不传等于应付 |\n| points_num | int | 否 | 积分数量（占位） |\n| points_amount | decimal | 否 | 积分金额（占位） |\n| pay_method | string | 否 | 支付方式 |\n| equipment_original_price | decimal | 否 | 设备原价；不传取明细最大原价 |\n| order_time | datetime | 否 | 下单时间 |\n| pay_time | datetime | 否 | 付款时间 |\n| ship_time | datetime | 否 | 发货时间 |\n| renting_time | datetime | 否 | 进入租赁中时间 |\n| operator_name | string | 否 | 日志操作人，默认「系统」 |\n\n### 请求字段 items[]\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| product_id | int | 否 | 商品 ID |\n| product_name | string | 建议 | 商品名称 |\n| product_number | string | 否 | 商品编号 |\n| product_image | string | 否 | 商品图 |\n| spec_name | string | 否 | 规格 |\n| daily_rent | decimal | 建议 | 日租金 |\n| rent_days | int | 建议 | 租期天数；内部最小按 1 |\n| rent_start_date | date | 否 | 起租日 |\n| rent_end_date | date | 否 | 到期日 |\n| deposit_amount | decimal | 否 | 押金 |\n| rent_subtotal | decimal | 否 | 租金小计；不传 = 日租×天数×数量 |\n| discount_amount | decimal | 否 | 优惠金额（占位） |\n| quantity | int | 否 | 数量，默认 1 |\n| locked_stock_qty | int | 否 | 锁定库存；不传默认等于数量 |\n| device_asset_no | string | 否 | 设备资产编号 |\n| serial_number | string | 否 | 序列号 |\n| equipment_original_price | decimal | 否 | 设备原价 |\n\n### 请求字段 address\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| consignee | string | 否 | 收货人 |\n| consignee_mobile | string | 否 | 收货电话 |\n| province | string | 否 | 省 |\n| city | string | 否 | 市 |\n| district | string | 否 | 区 |\n| address_detail | string | 否 | 详细地址 |\n| address_full | string | 否 | 完整地址；空则拼接 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| order_id | int | 新建订单 ID |\n| order_number | string | 新建订单号 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"order_id\": 1,\n    \"order_number\": \"RO-20260924-1\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "分配仓库",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "租赁订单 ID" },
+                { "key": "warehouse_code", "value": "HD01", "description": "分仓编码" },
+                { "key": "warehouse_name", "value": "海淀门店", "description": "仓库名称" },
+                { "key": "operator_name", "value": "仓管-刘伟", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/assignWarehouse?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "assignWarehouse"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 分配仓库（租赁）\n\n`POST /manage/trade/newRentOrder/assignWarehouse`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| warehouse_code | string | 条件 | 分仓编码；与名称不能同时为空 |\n| warehouse_name | string | 条件 | 仓库名称；与编码不能同时为空 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "添加标签",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "tag_name", "value": "租赁偏好", "description": "标签名" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/addTag?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "addTag"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 添加标签（租赁）\n\n`POST /manage/trade/newRentOrder/addTag`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| tag_name | string | 是 | 标签名，不能为空，同单不可重复 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| tag_id | int | 标签 ID |\n| order_id | int | 订单 ID |\n| tag_name | string | 标签名 |\n| add_time | datetime | 添加时间 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"tag_id\": 1,\n    \"order_id\": 1,\n    \"tag_name\": \"租赁偏好\",\n    \"add_time\": \"2026-09-24 15:00:00\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "删除标签",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "tag_id", "value": "{{tag_id}}", "description": "标签 ID" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/removeTag?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "removeTag"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 删除标签（租赁）\n\n`POST /manage/trade/newRentOrder/removeTag`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| tag_id | int | 是 | 标签 ID，须属于该订单 |\n| operator_name | string | 否 | 操作人 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "客服备注",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "remark_content", "value": "已设置归还提醒", "description": "备注；也可用 service_remark" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/addRemark?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "addRemark"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 客服备注（租赁）\n\n`POST /manage/trade/newRentOrder/addRemark`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| remark_content | string | 条件 | 备注内容；空则读 service_remark；最终不能为空 |\n| service_remark | string | 条件 | 兼容字段 |\n| operator_name | string | 否 | 操作人 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "退款",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "refund_amount", "value": "300", "description": "退款金额 > 0" },
+                { "key": "refund_reason", "value": "客户要求全额退", "description": "退款原因" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/refund?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "refund"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 退款（租赁）\n\n`POST /manage/trade/newRentOrder/refund`\n\n与「退租 returnRent」不同：本接口直接记退款并将状态改为 **`6` 已退款**。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| refund_amount | decimal | 是 | 退款金额，必须 > 0 |\n| refund_reason | string | 是 | 退款原因 |\n| operator_name | string | 否 | 操作人 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | `true` |\n\n### 状态变化\n\n| 字段 | 变化 |\n|------|------|\n| order_status | → `6`（已退款） |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "退租 / 提前归还",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "return_date", "value": "2026-09-24", "description": "退租日 YYYY-MM-DD；默认今天；不可晚于到期日" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/returnRent?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "returnRent"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 退租 / 提前归还\n\n`POST /manage/trade/newRentOrder/returnRent`\n\n**前置状态**：仅 `2`已发货 / `3`租赁中。\n\n**计算**：\n- 有效日租 = (租金金额 - 优惠) / 租期天数\n- 已用天数 = 起租日～退租日（含首尾），不超过租期\n- 退租金 = 未用天数 × 有效日租\n- 退押金 = 订单押金全额解冻\n- 合计应退 = 退租金 + 退押金\n\n成功后 `order_status` → **`4` 已归还**，并写 `ops`（op_type=`1`）与日志。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| return_date | date | 否 | 退租日，默认今天；不可晚于明细到期日；早于起租日则按起租日 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| used_days | int | 已使用天数 |\n| rent_days | int | 原租期总天数 |\n| effective_daily | decimal | 有效日租金（折后） |\n| rent_refund | decimal | 应退租金 |\n| deposit_refund | decimal | 应退/解冻押金 |\n| total_refund | decimal | 合计应退 |\n| return_date | date | 实际采用的退租日 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"used_days\": 30,\n    \"rent_days\": 30,\n    \"effective_daily\": 13.5,\n    \"rent_refund\": 0,\n    \"deposit_refund\": 300,\n    \"total_refund\": 300,\n    \"return_date\": \"2026-09-24\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "续租",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "renew_days", "value": "30", "description": "续租天数，必须 > 0" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/renew?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "renew"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 续租\n\n`POST /manage/trade/newRentOrder/renew`\n\n**前置状态**：仅 `2`已发货 / `3`租赁中。\n\n续租租金 = 日租金 × 续租天数；延长明细 `rent_end_date` / `rent_days`，累加主表租期与应付/实付；写 `ops`（op_type=`2`）。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| renew_days | int | 是 | 续租天数，必须 > 0 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| renew_days | int | 本次续租天数 |\n| renew_rent | decimal | 本次续租租金 |\n| rent_days | int | 续租后合计租期天数 |\n| daily_rent | decimal | 计算用日租金 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"renew_days\": 30,\n    \"renew_rent\": 450,\n    \"rent_days\": 60,\n    \"daily_rent\": 15\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "买断",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "buyout_price", "value": "297", "description": "买断价；不传则用设备原价 equipment_original_price" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/buyout?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "buyout"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 买断\n\n`POST /manage/trade/newRentOrder/buyout`\n\n**前置状态**：仅 `2`已发货 / `3`租赁中。\n\n规则：押金抵扣买断款，`buyout_payable = max(0, buyout_price - deposit_amount)`；买断后设备归用户，押金不再退还。状态 → **`5` 已买断**；写 `ops`（op_type=`3`）。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| buyout_price | decimal | 否 | 买断价（残值可调）；不传/空则用 `equipment_original_price`；不能为负 |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| buyout_price | decimal | 实际采用的买断价 |\n| deposit_offset | decimal | 押金抵扣额（等于订单押金） |\n| buyout_payable | decimal | 买断应付，≥0 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"buyout_price\": 297,\n    \"deposit_offset\": 300,\n    \"buyout_payable\": 0\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "报修",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "order_id", "value": "{{rent_order_id}}", "description": "订单 ID" },
+                { "key": "fault_type", "value": "设备无法开机/充电", "description": "故障类型，必填（自由文案）" },
+                { "key": "fault_desc", "value": "按下电源无无反应", "description": "故障描述" },
+                { "key": "handle_method", "value": "上门维修", "description": "处理方式（自由文案）" },
+                { "key": "operator_name", "value": "客服", "description": "操作人" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/trade/newRentOrder/repair?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "trade", "newRentOrder", "repair"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 报修\n\n`POST /manage/trade/newRentOrder/repair`\n\n写入报修记录并记日志，**不修改**订单状态。\n\n`fault_type` / `handle_method` 为自由文案（前端可做下拉，后端不强制枚举）。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| order_id | int | 是 | 订单 ID |\n| fault_type | string | 是 | 故障类型，trim 后不能为空，≤100 |\n| fault_desc | string | 否 | 故障描述，≤1000 |\n| handle_method | string | 否 | 处理方式，≤100（如：上门维修 / 寄回维修 / 换机） |\n| operator_name | string | 否 | 操作人；默认「客服」 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| repair_id | int | 报修记录 ID |\n| order_id | int | 订单 ID |\n| fault_type | string | 故障类型 |\n| fault_desc | string | 故障描述 |\n| handle_method | string | 处理方式 |\n| operator_name | string | 操作人 |\n| add_time | datetime | 创建时间 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"repair_id\": 1,\n    \"order_id\": 1,\n    \"fault_type\": \"设备无法开机/充电\",\n    \"fault_desc\": \"按下电源键无反应\",\n    \"handle_method\": \"上门维修\",\n    \"operator_name\": \"客服\",\n    \"add_time\": \"2026-09-24 16:00:00\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

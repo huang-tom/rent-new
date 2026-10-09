@@ -68,6 +68,40 @@ class TradeRepositoryServiceProvider extends LumenRepositoryServiceProvider
             //推广订单
             \Modules\Trade\Repositories\Contracts\DistributionOrderRepository::class =>
                 \Modules\Trade\Repositories\Eloquent\DistributionOrderRepositoryEloquent::class,
+
+            //新购买订单
+            \Modules\Trade\Repositories\Contracts\NewOrderRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderItemRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderItemRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderAddressRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderAddressRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderTagRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderTagRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderRefundRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderRefundRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderLogRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderLogRepositoryEloquent::class,
+
+            //新租赁订单
+            \Modules\Trade\Repositories\Contracts\NewRentOrderRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderItemRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderItemRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderAddressRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderAddressRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderTagRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderTagRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderRefundRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderRefundRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderLogRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderLogRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderOpRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderOpRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewRentOrderRepairRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewRentOrderRepairRepositoryEloquent::class,
+            \Modules\Trade\Repositories\Contracts\NewOrderStockLockRepository::class =>
+                \Modules\Trade\Repositories\Eloquent\NewOrderStockLockRepositoryEloquent::class,
         ];
 
         foreach ($bindings as $interface => $implementation) {

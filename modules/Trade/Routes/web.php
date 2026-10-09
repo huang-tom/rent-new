@@ -36,10 +36,10 @@ $router->group(['prefix' => 'manage/trade', 'namespace' => 'Manage', 'middleware
     //    前端 api/trade/orderBase.ts 声明了它，按钮在 views/trade/orderBase/index.vue:326，
     //    但显隐条件是 `row.has_supplier_trans == 0`，而 orderBase/list 从不返回该字段
     //    （全项目检索 has_supplier_trans：后端零引用）→ undefined == 0 为 false，按钮永远不渲染。
-    //    更根本的是本版本没有任何供应商体系（无供应商表、无 supplier 相关列）。
+    //    更根本的是本版本没有任何供应商体系（无供应商表、无 supplier 相关列）
     //    凭空实现等于发明一个业务功能，不属于"修断链"。详见本轮交付文档。
-
     $router->post('/orderLogistics/add', 'OrderLogisticsController@add');   //订单物流 [已补方法，原为静默 404]
+
     $router->post('/orderLogistics/edit', 'OrderLogisticsController@edit'); //修改订单物流
 
     $router->get('/orderReturn/list', 'OrderReturnController@list'); //售后订单
@@ -64,10 +64,40 @@ $router->group(['prefix' => 'manage/trade', 'namespace' => 'Manage', 'middleware
     $router->post('/orderInvoice/remove', 'OrderInvoiceController@remove'); // [新增 2026-09-22] 原先未注册
     $router->post('/orderInvoice/editStatus', 'OrderInvoiceController@editStatus');
 
-
     //推广订单列表
     $router->get('/distributionOrder/list', 'DistributionOrderController@list');
 
+    //新购买订单（与旧订单隔离）
+    $router->get('/newOrder/list', 'NewOrderController@list');
+    $router->get('/newOrder/get', 'NewOrderController@get');
+    $router->post('/newOrder/add', 'NewOrderController@add');
+    $router->post('/newOrder/assignWarehouse', 'NewOrderController@assignWarehouse');
+    $router->post('/newOrder/addTag', 'NewOrderController@addTag');
+    $router->post('/newOrder/removeTag', 'NewOrderController@removeTag');
+    $router->post('/newOrder/addRemark', 'NewOrderController@addRemark');
+    $router->post('/newOrder/refund', 'NewOrderController@refund');
+
+    //新租赁订单（与旧订单 / 新购买订单隔离）
+    $router->get('/newRentOrder/list', 'NewRentOrderController@list');
+    $router->get('/newRentOrder/get', 'NewRentOrderController@get');
+    $router->post('/newRentOrder/add', 'NewRentOrderController@add');
+    $router->post('/newRentOrder/assignWarehouse', 'NewRentOrderController@assignWarehouse');
+    $router->post('/newRentOrder/addTag', 'NewRentOrderController@addTag');
+    $router->post('/newRentOrder/removeTag', 'NewRentOrderController@removeTag');
+    $router->post('/newRentOrder/addRemark', 'NewRentOrderController@addRemark');
+    $router->post('/newRentOrder/refund', 'NewRentOrderController@refund');
+    $router->post('/newRentOrder/returnRent', 'NewRentOrderController@returnRent');
+    $router->post('/newRentOrder/renew', 'NewRentOrderController@renew');
+    $router->post('/newRentOrder/buyout', 'NewRentOrderController@buyout');
+    $router->post('/newRentOrder/repair', 'NewRentOrderController@repair');
+
+});
+
+/**
+ * 新订单支付回调，免登录
+ */
+$router->group(['prefix' => '/front/trade', 'namespace' => 'Manage'], function () use ($router) {
+    $router->post('/callback/payNotify', 'NewOrderPayController@payCallback');
 });
 
 /**

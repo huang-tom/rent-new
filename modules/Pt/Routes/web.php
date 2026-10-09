@@ -30,7 +30,6 @@ $router->group(['prefix' => 'front/pt', 'namespace' => 'Front'], function () use
 });
 
 $router->group(['prefix' => 'manage/pt', 'namespace' => 'Manage', 'middleware' => ['auth','admin']], function () use ($router) {
-
     $router->get('/productCategory/tree', 'ProductCategoryController@tree');
     $router->get('/productCategory/list', 'ProductCategoryController@list');
     $router->post('/productCategory/add', 'ProductCategoryController@add');
@@ -132,10 +131,53 @@ $router->group(['prefix' => 'manage/pt', 'namespace' => 'Manage', 'middleware' =
     //   也已下发；点开弹窗后「下载模板」直接调这两个接口，此前 404。
     //  这是本次 A/B/C 三类里唯一能靠「前端页面文件名相同」之外的线索找到的断链 ——
     //  productItem 的入口长在 productBase 页面上，只按页面名匹配会漏掉。
-    //⚠️ 配套的 productBase/importTemp、productItem/importTemp **后端完全不存在**，
+    //  配套的 productBase/importTemp、productItem/importTemp **后端完全不存在**，
     //  本次不实现：那是「新增导入功能」（需要 xlsx 解析 + 商品多表写入 + 字段校验规则），
     //  属于需求开发而非补断链。
     $router->get('/productBase/exportTemp', 'ProductBaseController@exportTemp');
     $router->get('/productItem/exportTemp', 'ProductItemController@exportTemp');
+
+
+    //新商品（独立主表 pt_new_product）
+    $router->get('/newProduct/list', 'NewProductController@list');
+    $router->get('/newProduct/statistics', 'NewProductController@statistics');
+    $router->get('/newProduct/get', 'NewProductController@get');
+    $router->post('/newProduct/save', 'NewProductController@save');
+    $router->post('/newProduct/remove', 'NewProductController@remove');
+    $router->post('/newProduct/editState', 'NewProductController@editState');
+    $router->post('/newProduct/audit', 'NewProductController@audit');
+    $router->post('/newProduct/batchEditState', 'NewProductController@batchEditState');
+    $router->post('/newProduct/batchAudit', 'NewProductController@batchAudit');
+
+    //新商品-租期档位
+    $router->get('/newProductRentPeriod/list', 'NewProductRentPeriodController@list');
+    $router->post('/newProductRentPeriod/add', 'NewProductRentPeriodController@add');
+    $router->post('/newProductRentPeriod/edit', 'NewProductRentPeriodController@edit');
+    $router->post('/newProductRentPeriod/remove', 'NewProductRentPeriodController@remove');
+    $router->post('/newProductRentPeriod/editState', 'NewProductRentPeriodController@editState');
+
+    //新商品-推广分类
+    $router->get('/newProductPromoCate/list', 'NewProductPromoCateController@list');
+    $router->post('/newProductPromoCate/add', 'NewProductPromoCateController@add');
+    $router->post('/newProductPromoCate/edit', 'NewProductPromoCateController@edit');
+    $router->post('/newProductPromoCate/remove', 'NewProductPromoCateController@remove');
+    $router->post('/newProductPromoCate/editState', 'NewProductPromoCateController@editState');
+
+    //新商品-推广商品
+    $router->get('/newProductPromo/list', 'NewProductPromoController@list');
+    $router->post('/newProductPromo/add', 'NewProductPromoController@add');
+    $router->post('/newProductPromo/remove', 'NewProductPromoController@remove');
+    $router->post('/newProductPromo/editSort', 'NewProductPromoController@editSort');
+
+    //新商品-评论
+    $router->get('/newProductComment/list', 'NewProductCommentController@list');
+    $router->get('/newProductComment/statistics', 'NewProductCommentController@statistics');
+    $router->post('/newProductComment/add', 'NewProductCommentController@add');
+    $router->post('/newProductComment/edit', 'NewProductCommentController@edit');
+    $router->post('/newProductComment/audit', 'NewProductCommentController@audit');
+    $router->post('/newProductComment/remove', 'NewProductCommentController@remove');
+    $router->post('/newProductComment/addReply', 'NewProductCommentController@addReply');
+    $router->post('/newProductComment/editReply', 'NewProductCommentController@editReply');
+    $router->post('/newProductComment/removeReply', 'NewProductCommentController@removeReply');
 
 });

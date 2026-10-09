@@ -77,7 +77,27 @@ class PtRepositoryServiceProvider extends LumenRepositoryServiceProvider
                 \Modules\Pt\Repositories\Eloquent\ProductCommentReplyRepositoryEloquent::class,
             //评论点赞
             \Modules\Pt\Repositories\Contracts\ProductCommentHelpfulRepository::class =>
-                \Modules\Pt\Repositories\Eloquent\ProductCommentHelpfulRepositoryEloquent::class
+                \Modules\Pt\Repositories\Eloquent\ProductCommentHelpfulRepositoryEloquent::class,
+
+            //新商品
+            \Modules\Pt\Repositories\Contracts\NewProductRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductRepositoryEloquent::class,
+            \Modules\Pt\Repositories\Contracts\NewProductRentPeriodRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductRentPeriodRepositoryEloquent::class,
+            \Modules\Pt\Repositories\Contracts\NewProductRentPriceRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductRentPriceRepositoryEloquent::class,
+
+            //商品推广
+            \Modules\Pt\Repositories\Contracts\NewProductPromoCateRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductPromoCateRepositoryEloquent::class,
+            \Modules\Pt\Repositories\Contracts\NewProductPromoRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductPromoRepositoryEloquent::class,
+
+            //新商品评论
+            \Modules\Pt\Repositories\Contracts\NewProductCommentRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductCommentRepositoryEloquent::class,
+            \Modules\Pt\Repositories\Contracts\NewProductCommentReplyRepository::class =>
+                \Modules\Pt\Repositories\Eloquent\NewProductCommentReplyRepositoryEloquent::class,
 
         ];
 
