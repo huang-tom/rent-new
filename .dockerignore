@@ -1,0 +1,16 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+.env.example
+node_modules
+storage/logs/*
+!storage/logs/.gitignore
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+tests
+phpunit.xml
+.styleci.yml
+.editorconfig
+.DS_Store

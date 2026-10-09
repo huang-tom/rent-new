@@ -1,0 +1,13 @@
+{
+    "name": "Sns",
+    "alias": "sns",
+    "description": "社交圈子（动态/评论/分类）后台管理模块 [本地自研 2026-09-22]",
+    "keywords": [],
+    "order": 0,
+    "providers": [
+        "Modules\\Sns\\Providers\\SnsServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": []
+}
