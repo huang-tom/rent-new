@@ -27,6 +27,13 @@ $router->group(['prefix' => 'front/pt', 'namespace' => 'Front'], function () use
     $router->get('/product/listItem', 'ProductController@listItem');
     $router->get('/product/getSearchFilter', 'ProductController@getSearchFilter'); //商品筛选属性
 
+    // 新商品前台查询，复用后台控制器，不挂登录
+    $router->group(['namespace' => '\Modules\Pt\Http\Controllers\Manage'], function () use ($router) {
+        $router->get('/newProduct/get', 'NewProductController@get');
+        $router->get('/newProductPromoCate/list', 'NewProductPromoCateController@list');
+        $router->get('/newProductPromo/list', 'NewProductPromoController@list');
+    });
+
 });
 
 $router->group(['prefix' => 'manage/pt', 'namespace' => 'Manage', 'middleware' => ['auth','admin']], function () use ($router) {
