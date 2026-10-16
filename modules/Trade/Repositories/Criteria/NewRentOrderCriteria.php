@@ -4,6 +4,7 @@ namespace Modules\Trade\Repositories\Criteria;
 
 use Illuminate\Database\Eloquent\Builder;
 use Kuteshop\Core\Repository\Criteria\Criteria;
+use Modules\Account\Repositories\Models\User;
 
 class NewRentOrderCriteria extends Criteria
 {
@@ -41,6 +42,10 @@ class NewRentOrderCriteria extends Criteria
 
         if ($this->request->has('order_status') && $this->request->get('order_status') !== '') {
             $query->where('order_status', (int)$this->request->get('order_status'));
+        }
+
+        if ((int)$this->request->get('only_self', 0) === 1) {
+            $query->where('user_id', (int)User::getUserId());
         }
 
         if ($this->request->has('rent_days') && $this->request->get('rent_days') !== '') {

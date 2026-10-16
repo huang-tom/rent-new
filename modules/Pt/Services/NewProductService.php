@@ -238,6 +238,8 @@ class NewProductService extends BaseService
             'cycle_type' => 0,
             'settle_policy' => 0,
             'need_tier_price' => 0,
+            'rent_period_ids' => '',
+            'renew_period_ids' => '',
             'stock_total' => (int)$request->input('stock_total', 0),
             'stock_warning' => (int)$request->input('stock_warning', 0),
             'spec_json' => $spec_json ?: '',
@@ -255,13 +257,21 @@ class NewProductService extends BaseService
             $row['unit'] = $request->input('unit', '');
         }
 
-        // 租赁相关
+        // 租赁相关。仅租赁也保存销售价，供租赁订单快照和买断原价使用
         if (in_array($sale_mode, [self::SALE_MODE_RENT, self::SALE_MODE_BUY_RENT], true)) {
+            $row['sale_price'] = $request->input('sale_price', 0);
             $row['deposit'] = $request->input('deposit', 0);
             $row['daily_rent'] = $request->input('daily_rent', 0);
             $row['cycle_type'] = (int)$request->input('cycle_type', 0);
             $row['settle_policy'] = (int)$request->input('settle_policy', 0);
             $row['need_tier_price'] = (int)$request->input('need_tier_price', 0);
+            $rent_period_ids = $this->parsePeriodIds($request->input('rent_period_ids', ''));
+            $renew_period_ids = $this->parsePeriodIds($request->input('renew_period_ids', ''));
+            $row['rent_period_ids'] = implode(',', $rent_period_ids);
+            $renew_period_ids = array_values(array_filter($renew_period_ids, function ($period_id) use ($rent_period_ids) {
+                return in_array($period_id, $rent_period_ids, true);
+            }));
+            $row['renew_period_ids'] = implode(',', $renew_period_ids);
         }
 
         return $row;
@@ -294,6 +304,59 @@ class NewProductService extends BaseService
                 'daily_rent' => $item['daily_rent'] ?? 0,
             ]);
         }
+    }
+
+    /**
+     * 档位ID：支持逗号串或数组，0 和空值丢弃
+     */
+    private function parsePeriodIds($value)
+    {
+        if (is_array($value)) {
+            $parts = $value;
+        } else {
+            $parts = explode(',', (string)$value);
+        }
+
+        $period_ids = [];
+        foreach ($parts as $part) {
+            $period_id = (int)trim((string)$part);
+            if ($period_id > 0 && !in_array($period_id, $period_ids, true)) {
+                $period_ids[] = $period_id;
+            }
+        }
+
+        return $period_ids;
+    }
+
+    private function getPeriodMap(array $period_ids)
+    {
+        $period_ids = array_values(array_unique(array_filter($period_ids)));
+        if (!$period_ids) {
+            return [];
+        }
+
+        $periods = $this->newProductRentPeriodRepository->find([['period_id', 'IN', $period_ids]]) ?: [];
+        $period_map = [];
+        foreach ($periods as $period) {
+            $period_map[(int)$period['period_id']] = $period;
+        }
+
+        return $period_map;
+    }
+
+    private function buildPeriodList(array $period_ids, array $period_map)
+    {
+        $list = [];
+        foreach ($period_ids as $period_id) {
+            $period = $period_map[$period_id] ?? null;
+            $list[] = [
+                'period_id' => $period_id,
+                'period_name' => $period['period_name'] ?? '',
+                'period_days' => $period ? (int)$period['period_days'] : 0,
+            ];
+        }
+
+        return $list;
     }
 
     /**
@@ -358,6 +421,13 @@ class NewProductService extends BaseService
             $product['spec_list'] = is_array($decoded) ? $decoded : [];
         }
         $product['rent_prices'] = $rent_price_list;
+        $rent_period_ids = $this->parsePeriodIds($product['rent_period_ids'] ?? '');
+        $renew_period_ids = $this->parsePeriodIds($product['renew_period_ids'] ?? '');
+        $period_detail_map = $this->getPeriodMap(array_merge($rent_period_ids, $renew_period_ids));
+        $product['rent_period_ids'] = implode(',', $rent_period_ids);
+        $product['renew_period_ids'] = implode(',', $renew_period_ids);
+        $product['rent_periods'] = $this->buildPeriodList($rent_period_ids, $period_detail_map);
+        $product['renew_periods'] = $this->buildPeriodList($renew_period_ids, $period_detail_map);
         $product['status_text'] = $this->formatStatusText($product);
         $product['sale_mode_text'] = $this->formatSaleModeText($product['sale_mode'] ?? 0);
 

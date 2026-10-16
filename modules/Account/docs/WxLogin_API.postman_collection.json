@@ -1,0 +1,121 @@
+{
+  "info": {
+    "_postman_id": "d5e6f7a8-b9c0-1234-def0-accwxlogin001",
+    "name": "小程序登录 API（openid + 手机号）",
+    "description": "微信小程序登录接口，前缀 `front/account/login`。先用 openid 判断是否注册过；没注册再用手机号授权注册并登录。\n\n---\n\n## 通用说明\n\n| 项 | 说明 |\n|----|------|\n| 前缀 | `{{baseUrl}}/front/account/login` |\n| 鉴权 | 两个接口都不需要登录 |\n| 请求方式 | `POST`，支持 `application/x-www-form-urlencoded` 或 JSON |\n| 统一响应外壳 | `{ status, code, msg, data }` |\n| 失败响应 | HTTP 仍为 200，`status = 250`、`code = 400`，`msg` 为错误原因，无 `data` |\n| 登录后鉴权 | 后续需登录的接口，Query 传 `api_token={{token}}`，或按项目约定传 Token |\n| 微信配置 | 后台需配置小程序 `wechat_xcx_app_id`、`wechat_xcx_app_secret` |\n\n### 统一响应外壳字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| status | int | 成功为 200 |\n| code | int | 成功为 200 |\n| msg | string | 成功为「操作成功」，失败为错误原因 |\n| data | object | 业务数据 |\n\n## 前端登录流程\n\n1. 小程序启动时调用 `wx.login` 拿到 `code`，传给「openid 登录」。\n2. 返回 `registered = true`：直接保存 `token`，登录完成。\n3. 返回 `registered = false`：保存返回的 `openid`，展示「手机号快捷登录」按钮（`button open-type=\"getPhoneNumber\"`）。\n4. 用户授权后，把 `bindgetphonenumber` 回调里的 `code` 和第 3 步的 `openid` 一起传给「手机号登录/注册」，保存返回的 `token`。\n\n注意：`wx.login` 的 `code` 和手机号授权的 `code` 不是同一个，不能混用；两者都只能使用一次，手机号 `code` 有效期 5 分钟。\n\n## 数据存储\n\n注册和绑定都用原有表，没有新增字段。\n\n| 内容 | 表 | 说明 |\n|------|------|------|\n| 手机号 | `account_user_info` | `user_mobile`（不含区号）、`user_intl`（如 `+86`） |\n| 手机号绑定 | `account_user_bind_connect` | `bind_id` 为 `+86手机号`，`bind_type = 1` |\n| 小程序 openid | `account_user_bind_connect` | `bind_id`、`bind_openid` 为 openid，`bind_type = 15` |\n\n### 集合变量\n\n| 变量 | 说明 |\n|------|------|\n| baseUrl | 如 `http://127.0.0.1:8000` |\n| login_code | `wx.login` 返回的 code，需在小程序里实时获取 |\n| phone_code | 手机号授权回调的 code，需在小程序里实时获取 |\n| openid | 「openid 登录」返回，调用后自动写入 |\n| token | 登录后返回，调用后自动写入 |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "login_code", "value": "" },
+    { "key": "phone_code", "value": "" },
+    { "key": "openid", "value": "" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. 小程序登录（login）",
+      "description": "路径前缀：`/front/account/login`\n\n先调「openid 登录」，未注册再调「手机号登录/注册」。",
+      "item": [
+        {
+          "name": "openid 登录",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data) {",
+                  "  if (res.data.openid) { pm.collectionVariables.set('openid', res.data.openid); }",
+                  "  if (res.data.token) { pm.collectionVariables.set('token', res.data.token); }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "code", "value": "{{login_code}}", "description": "wx.login 返回的 code，必填，只能使用一次" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/front/account/login/wxOpenidLogin",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "account", "login", "wxOpenidLogin"]
+            },
+            "description": "## openid 登录\n\n`POST /front/account/login/wxOpenidLogin`\n\n服务端用 `code` 调微信 `jscode2session` 换取 `openid`，再查 `account_user_bind_connect` 中 `bind_type = 15` 的绑定记录：\n\n- 已绑定账号：签发登录 token，`registered = true`\n- 未绑定：不报错，`registered = false`，返回 `openid` 供「手机号登录/注册」使用\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| code | string | 是 | `wx.login` 返回的 code |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| registered | bool | 是否已注册。`true` 已注册并已登录 / `false` 未注册 |\n| openid | string | 小程序用户 openid；未注册时前端需保存，传给手机号登录 |\n| phone | string | 手机号（不含区号）；未注册时为空字符串 |\n| token | string | 登录 token；未注册时为空字符串 |\n| user_id | int | 用户 ID；未注册时为 0 |\n\n### 常见错误 msg\n\n| msg | 原因 |\n|------|------|\n| 登录凭证不能为空 | 未传 `code` |\n| 微信返回的 errmsg（如 `invalid code`） | `code` 无效、已使用或已过期 |\n| 微信登录失败 | 请求微信失败，或未返回 openid |\n| 用户不存在 | 绑定记录对应的账号已不存在 |\n| 您的账号已被禁用,请联系管理员 | 账号被禁用 |"
+          },
+          "response": [
+            {
+              "name": "已注册",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"phone\": \"13912348842\",\n    \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.xxx\",\n    \"user_id\": 10086,\n    \"registered\": true,\n    \"openid\": \"oXYZ1234567890abcdefghijklmn\"\n  }\n}"
+            },
+            {
+              "name": "未注册",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"registered\": false,\n    \"openid\": \"oXYZ1234567890abcdefghijklmn\",\n    \"phone\": \"\",\n    \"token\": \"\",\n    \"user_id\": 0\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "手机号登录/注册",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res && res.data && res.data.token) { pm.collectionVariables.set('token', res.data.token); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "openid", "value": "{{openid}}", "description": "openid 登录未注册时返回的 openid，必填" },
+                { "key": "code", "value": "{{phone_code}}", "description": "手机号授权回调的 code，必填，5 分钟内有效且只能使用一次" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/front/account/login/wxPhoneLogin",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "account", "login", "wxPhoneLogin"]
+            },
+            "description": "## 手机号登录/注册\n\n`POST /front/account/login/wxPhoneLogin`\n\n服务端用 `code` 调微信 `phonenumber.getPhoneNumber` 换手机号，校验号码有效后按手机号查账号：\n\n- 未注册：按手机号注册新账号，账号名为 `+区号手机号`（如 `+8613912348842`），同时写入手机号绑定和 openid 绑定，再登录\n- 已注册：直接登录；该账号还没绑定这个 openid 时补绑\n- openid 已绑定在其他账号上：报错，不注册也不改绑\n\n服务端不会再向微信核对 `openid`，直接使用前端传入的值。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| openid | string | 是 | 「openid 登录」未注册时返回的 openid |\n| code | string | 是 | `getPhoneNumber` 回调里的 code（不是 `wx.login` 的 code） |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| phone | string | 手机号（不含区号） |\n| token | string | 登录 token |\n| user_id | int | 用户 ID |\n\n### 常见错误 msg\n\n| msg | 原因 |\n|------|------|\n| openid不能为空 | 未传 `openid` |\n| 手机号凭证不能为空 | 未传 `code` |\n| 微信返回的 errmsg | 手机号 `code` 无效、已使用或已过期 |\n| 获取手机号失败 | 请求微信失败，或未返回手机号 |\n| 请输入正确的手机号！ | 微信返回的号码不是有效手机号 |\n| 手机号码解析失败！ | 号码无法解析 |\n| 该微信已绑定其他账号 | 该 openid 已绑定到其他账号 |\n| 操作失败: … | 注册新账号失败 |\n| 绑定微信失败 | 写入 openid 绑定失败 |\n| 您的账号已被禁用,请联系管理员 | 账号被禁用 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"phone\": \"13912348842\",\n    \"token\": \"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.xxx\",\n    \"user_id\": 10086\n  }\n}"
+            },
+            {
+              "name": "openid 已绑定其他账号",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 250,\n  \"code\": 400,\n  \"msg\": \"该微信已绑定其他账号\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -117,7 +117,7 @@ class NewOrderStockLockService
     }
 
     /**
-     * 每分钟：待支付超过 30 分钟仍未支付则关闭购买单和租赁单
+     * 每分钟：待支付、支付中超过 30 分钟仍未支付则关闭购买单和租赁单
      */
     public function closeUnpaidOrders()
     {
@@ -125,14 +125,14 @@ class NewOrderStockLockService
         $buy_count = $this->closeOrders(
             'trade_new_order',
             'trade_new_order_log',
-            NewOrderService::STATUS_PENDING,
+            [NewOrderService::STATUS_PENDING, NewOrderService::STATUS_PAYING],
             NewOrderService::STATUS_CLOSED,
             $deadline
         );
         $rent_count = $this->closeOrders(
             'trade_new_rent_order',
             'trade_new_rent_order_log',
-            NewRentOrderService::STATUS_PENDING,
+            [NewRentOrderService::STATUS_PENDING, NewRentOrderService::STATUS_PAYING],
             NewRentOrderService::STATUS_CLOSED,
             $deadline
         );
@@ -296,11 +296,12 @@ class NewOrderStockLockService
             ]);
     }
 
-    private function closeOrders($order_table, $log_table, $pending_status, $closed_status, $deadline)
+    private function closeOrders($order_table, $log_table, $pending_statuses, $closed_status, $deadline)
     {
+        $pending_statuses = array_values((array)$pending_statuses);
         $orders = DB::table($order_table)
             ->where('is_deleted', 0)
-            ->where('order_status', $pending_status)
+            ->whereIn('order_status', $pending_statuses)
             ->where('order_time', '<=', $deadline)
             ->get();
 
@@ -310,7 +311,7 @@ class NewOrderStockLockService
             $order = (array)$order;
             $affected = DB::table($order_table)
                 ->where('order_id', (int)$order['order_id'])
-                ->where('order_status', $pending_status)
+                ->whereIn('order_status', $pending_statuses)
                 ->update([
                     'order_status' => $closed_status,
                     'update_time' => $now,
@@ -346,12 +347,14 @@ class NewOrderStockLockService
         if ((int)$order_type === self::TYPE_RENT) {
             return !in_array((int)$order_status, [
                 NewRentOrderService::STATUS_PENDING,
+                NewRentOrderService::STATUS_PAYING,
                 NewRentOrderService::STATUS_CLOSED,
             ], true);
         }
 
         return !in_array((int)$order_status, [
             NewOrderService::STATUS_PENDING,
+            NewOrderService::STATUS_PAYING,
             NewOrderService::STATUS_CLOSED,
         ], true);
     }

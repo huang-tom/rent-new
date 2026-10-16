@@ -134,6 +134,31 @@ class LoginController extends BaseController
     /**
      * 手机验证码登录
      */
+    /**
+     * 小程序手机号登录/注册
+     * code 为 button open-type=getPhoneNumber 回调里的动态令牌
+     * openid 为 wxOpenidLogin 未注册时返回的 openid
+     */
+    public function wxPhoneLogin(Request $request)
+    {
+        $data = $this->loginService->wxPhoneLogin($request);
+
+        return Respond::success($data);
+    }
+
+
+    /**
+     * 小程序 openid 登录
+     * code 为 wx.login 的 code；未绑定账号时 registered=false 并返回 openid
+     */
+    public function wxOpenidLogin(Request $request)
+    {
+        $data = $this->loginService->wxOpenidLogin($request);
+
+        return Respond::success($data);
+    }
+
+
     public function doSmsLogin(Request $request)
     {
         $verify_key = $request->input('verify_key', '');

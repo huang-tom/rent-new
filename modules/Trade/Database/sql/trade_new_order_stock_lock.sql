@@ -21,6 +21,6 @@ CREATE TABLE IF NOT EXISTS `trade_new_order_stock_lock` (
 
 -- 已有订单表补字段（列已存在时跳过对应 ALTER）
 ALTER TABLE `trade_new_order` ADD COLUMN `stock_locked` tinyint NOT NULL DEFAULT 0 COMMENT '库存是否锁定:0未锁定;1已锁定' AFTER `assign_warehouse_time`;
-ALTER TABLE `trade_new_order` MODIFY `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3已完成;4已退款;5已关闭';
+ALTER TABLE `trade_new_order` MODIFY `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3已完成;4已退款;5已关闭;6支付中';
 ALTER TABLE `trade_new_rent_order` ADD COLUMN `stock_locked` tinyint NOT NULL DEFAULT 0 COMMENT '库存是否锁定:0未锁定;1已锁定' AFTER `buyout_time`;
-ALTER TABLE `trade_new_rent_order` MODIFY `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3租赁中;4已归还;5已买断;6已退款;7已关闭';
+ALTER TABLE `trade_new_rent_order` MODIFY `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3租赁中;4已归还;5已买断;6已退款;7已关闭;8支付中';

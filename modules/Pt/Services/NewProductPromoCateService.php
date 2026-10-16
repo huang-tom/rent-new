@@ -45,10 +45,15 @@ class NewProductPromoCateService extends BaseService
             return $data;
         }
 
-        $category_ids = array_unique(array_filter(array_column($data['data'], 'category_id')));
+        $category_ids = [];
+        foreach ($data['data'] as $row) {
+            foreach ($this->parseCategoryIds($row['category_id'] ?? '') as $category_id) {
+                $category_ids[$category_id] = $category_id;
+            }
+        }
         $category_map = [];
         if ($category_ids) {
-            $categories = $this->productCategoryRepository->gets($category_ids) ?: [];
+            $categories = $this->productCategoryRepository->gets(array_values($category_ids)) ?: [];
             foreach ($categories as $category) {
                 $category_map[$category['category_id']] = $category['category_name'] ?? '';
             }
@@ -70,7 +75,15 @@ class NewProductPromoCateService extends BaseService
 
         foreach ($data['data'] as $k => $row) {
             $cate_id = (int)$row['cate_id'];
-            $data['data'][$k]['category_name'] = $category_map[$row['category_id']] ?? '';
+            $row_category_ids = $this->parseCategoryIds($row['category_id'] ?? '');
+            $category_names = [];
+            foreach ($row_category_ids as $category_id) {
+                if (!empty($category_map[$category_id])) {
+                    $category_names[] = $category_map[$category_id];
+                }
+            }
+            $data['data'][$k]['category_id'] = implode(',', $row_category_ids);
+            $data['data'][$k]['category_name'] = implode(',', $category_names);
             $data['data'][$k]['product_count'] = (int)($count_map[$cate_id] ?? 0);
         }
 
@@ -165,5 +178,21 @@ class NewProductPromoCateService extends BaseService
         }
 
         return $cate;
+    }
+
+    /**
+     * 逗号分隔的商品分类ID，0 和空值丢弃
+     */
+    private function parseCategoryIds($value)
+    {
+        $category_ids = [];
+        foreach (explode(',', (string)$value) as $part) {
+            $category_id = (int)trim($part);
+            if ($category_id > 0 && !in_array($category_id, $category_ids, true)) {
+                $category_ids[] = $category_id;
+            }
+        }
+
+        return $category_ids;
     }
 }

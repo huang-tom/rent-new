@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS `trade_new_rent_order` (
   `fulfill_warehouse_code` varchar(50) NOT NULL DEFAULT '' COMMENT '履约分仓编码',
   `fulfill_warehouse_name` varchar(100) NOT NULL DEFAULT '' COMMENT '履约仓库名称',
   `user_id` int unsigned NOT NULL DEFAULT 0 COMMENT '登录用户ID(account_user_base)',
-  `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3租赁中;4已归还;5已买断;6已退款;7已关闭',
+  `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3租赁中;4已归还;5已买断;6已退款;7已关闭;8支付中',
   `delivery_type` varchar(50) NOT NULL DEFAULT '' COMMENT '配送方式',
   `express_no` varchar(50) NOT NULL DEFAULT '' COMMENT '快递单号',
   `buyer_message` varchar(500) NOT NULL DEFAULT '' COMMENT '买家留言',
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `trade_new_rent_order` (
   `points_num` int NOT NULL DEFAULT 0 COMMENT '积分数量(占位，不计算)',
   `points_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '积分抵扣金额(占位)',
   `pay_method` varchar(50) NOT NULL DEFAULT '' COMMENT '支付方式文案',
-  `equipment_original_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '设备原价(买断参考)',
+  `equipment_original_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '设备原价，下单时按商品销售价×数量汇总',
   `buyout_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '买断价',
   `buyout_payable` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '买断应付',
   `order_time` datetime DEFAULT NULL COMMENT '下单时间',
@@ -60,18 +60,17 @@ CREATE TABLE IF NOT EXISTS `trade_new_rent_order_item` (
   `product_number` varchar(50) NOT NULL DEFAULT '' COMMENT '商品编号',
   `product_image` varchar(255) NOT NULL DEFAULT '' COMMENT '商品图',
   `spec_name` varchar(100) NOT NULL DEFAULT '' COMMENT '规格',
-  `daily_rent` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '日租金',
-  `rent_days` int NOT NULL DEFAULT 0 COMMENT '租期天数',
-  `rent_start_date` date DEFAULT NULL COMMENT '起租日',
-  `rent_end_date` date DEFAULT NULL COMMENT '到期日',
+  `period_id` int unsigned NOT NULL DEFAULT 0 COMMENT '租期档位ID',
+  `period_name` varchar(50) NOT NULL DEFAULT '' COMMENT '租期类型文案',
+  `sale_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '商品销售单价',
+  `rent_start_date` date DEFAULT NULL COMMENT '起租日（后续使用，下单暂不写）',
+  `rent_end_date` date DEFAULT NULL COMMENT '到期日（后续使用，下单暂不写）',
   `deposit_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '押金',
   `rent_subtotal` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '租金小计',
   `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '优惠金额(占位)',
-  `quantity` int NOT NULL DEFAULT 1 COMMENT '数量',
-  `locked_stock_qty` int NOT NULL DEFAULT 0 COMMENT '锁定库存数',
+  `quantity` int NOT NULL DEFAULT 1 COMMENT '数量（租赁数，后续扣库存用这个数量）',
   `device_asset_no` varchar(100) NOT NULL DEFAULT '' COMMENT '设备资产编号',
   `serial_number` varchar(100) NOT NULL DEFAULT '' COMMENT '序列号',
-  `equipment_original_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '设备原价',
   `add_time` datetime DEFAULT NULL COMMENT '创建时间',
   PRIMARY KEY (`item_id`),
   KEY `idx_order_id` (`order_id`)
@@ -159,3 +158,14 @@ CREATE TABLE IF NOT EXISTS `trade_new_rent_order_repair` (
   PRIMARY KEY (`repair_id`),
   KEY `idx_order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='新租赁订单报修记录';
+
+-- 已建表明细调整（列已存在或已删除时跳过对应语句）：
+-- ALTER TABLE `trade_new_rent_order_item`
+--   ADD COLUMN `period_id` int unsigned NOT NULL DEFAULT 0 COMMENT '租期档位ID' AFTER `spec_name`,
+--   ADD COLUMN `period_name` varchar(50) NOT NULL DEFAULT '' COMMENT '租期类型文案' AFTER `period_id`,
+--   ADD COLUMN `sale_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '商品销售单价' AFTER `period_name`;
+-- ALTER TABLE `trade_new_rent_order_item`
+--   DROP COLUMN `daily_rent`,
+--   DROP COLUMN `rent_days`,
+--   DROP COLUMN `locked_stock_qty`,
+--   DROP COLUMN `equipment_original_price`;

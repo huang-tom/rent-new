@@ -105,6 +105,7 @@ class NewProductPromoService extends BaseService
 
         $now = getDateTime();
         $success = 0;
+        $new_category_ids = [];
         foreach ($product_ids as $product_id) {
             $product = $this->newProductRepository->getOne($product_id);
             if (!$product || !empty($product['is_deleted'])) {
@@ -128,6 +129,7 @@ class NewProductPromoService extends BaseService
                     'sort' => (int)$sort,
                     'update_time' => $now,
                 ]);
+                $this->collectCategoryId($product, $new_category_ids);
                 $success++;
                 continue;
             }
@@ -140,11 +142,26 @@ class NewProductPromoService extends BaseService
                 'add_time' => $now,
                 'update_time' => $now,
             ]);
+            $this->collectCategoryId($product, $new_category_ids);
             $success++;
         }
 
         if ($success <= 0) {
             throw new ErrorException('没有可绑定的商品（可能已绑定或商品不存在）');
+        }
+
+        if ($new_category_ids) {
+            $cate = $this->newProductPromoCateRepository->getOne($type);
+            $category_ids = $this->parseCategoryIds($cate['category_id'] ?? '');
+            foreach ($new_category_ids as $category_id) {
+                if (!in_array($category_id, $category_ids, true)) {
+                    $category_ids[] = $category_id;
+                }
+            }
+            $this->newProductPromoCateRepository->edit($type, [
+                'category_id' => implode(',', $category_ids),
+                'update_time' => $now,
+            ]);
         }
 
         return $success;
@@ -167,6 +184,8 @@ class NewProductPromoService extends BaseService
         if (!$result) {
             throw new ErrorException('删除失败');
         }
+
+        $this->refreshCateCategoryId((int)$row['type']);
 
         return true;
     }
@@ -193,5 +212,82 @@ class NewProductPromoService extends BaseService
         if (!$cate || !empty($cate['is_deleted'])) {
             throw new ErrorException('推广分类不存在');
         }
+    }
+
+    /**
+     * 解绑后按剩余绑定商品重写推广分类 category_id（逗号分隔，未维护分类的不写入）
+     */
+    private function refreshCateCategoryId($cate_id)
+    {
+        $cate = $this->newProductPromoCateRepository->getOne($cate_id);
+        if (!$cate || !empty($cate['is_deleted'])) {
+            return;
+        }
+
+        $rows = $this->repository->find(
+            [
+                ['type', '=', $cate_id],
+                ['is_deleted', '=', 0],
+            ],
+            [
+                'sort' => 'ASC',
+                'id' => 'ASC',
+            ]
+        ) ?: [];
+
+        $category_ids = [];
+        if ($rows) {
+            $product_ids = array_values(array_unique(array_column($rows, 'product_id')));
+            $product_rows = $this->newProductRepository->find([
+                ['product_id', 'IN', $product_ids],
+                ['is_deleted', '=', 0],
+            ]) ?: [];
+            $products = [];
+            foreach ($product_rows as $product) {
+                $products[$product['product_id']] = $product;
+            }
+            foreach ($rows as $row) {
+                $product = $products[$row['product_id']] ?? null;
+                if (!$product) {
+                    continue;
+                }
+                $this->collectCategoryId($product, $category_ids);
+            }
+        }
+
+        $next = implode(',', $category_ids);
+        $current = implode(',', $this->parseCategoryIds($cate['category_id'] ?? ''));
+        if ($next === $current) {
+            return;
+        }
+
+        $this->newProductPromoCateRepository->edit($cate_id, [
+            'category_id' => $next,
+            'update_time' => getDateTime(),
+        ]);
+    }
+
+    private function collectCategoryId(array $product, array &$category_ids)
+    {
+        $category_id = (int)($product['category_id'] ?? 0);
+        if ($category_id > 0 && !in_array($category_id, $category_ids, true)) {
+            $category_ids[] = $category_id;
+        }
+    }
+
+    /**
+     * 逗号分隔的商品分类ID，0 和空值丢弃
+     */
+    private function parseCategoryIds($value)
+    {
+        $category_ids = [];
+        foreach (explode(',', (string)$value) as $part) {
+            $category_id = (int)trim($part);
+            if ($category_id > 0 && !in_array($category_id, $category_ids, true)) {
+                $category_ids[] = $category_id;
+            }
+        }
+
+        return $category_ids;
     }
 }

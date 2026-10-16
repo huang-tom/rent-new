@@ -33,6 +33,8 @@ class NewOrderService extends BaseService
     const STATUS_REFUNDED = 4;
     /** 已关闭 */
     const STATUS_CLOSED = 5;
+    /** 支付中（微信下单后由待支付转入） */
+    const STATUS_PAYING = 6;
 
     /** 购买订单 */
     const ORDER_TYPE_BUY = 1;
@@ -179,41 +181,18 @@ class NewOrderService extends BaseService
         DB::beginTransaction();
         try {
             $user_id = (int)User::getUserId();
+            $built = $this->buildBuyItems($items, $now);
+            $normalized_items = $built['items'];
+            $product_amount = $built['product_amount'];
 
-            $product_amount = 0;
-            $normalized_items = [];
-            foreach ($items as $item) {
-                $qty = max(1, (int)($item['quantity'] ?? 1));
-                $price = (float)($item['unit_price'] ?? 0);
-                $subtotal = isset($item['subtotal']) ? (float)$item['subtotal'] : round($price * $qty, 2);
-                $product_amount += $subtotal;
-                $normalized_items[] = [
-                    'product_id' => (int)($item['product_id'] ?? 0),
-                    'product_name' => $item['product_name'] ?? '',
-                    'product_number' => $item['product_number'] ?? '',
-                    'product_image' => $item['product_image'] ?? '',
-                    'spec_name' => $item['spec_name'] ?? '',
-                    'unit_price' => $price,
-                    'quantity' => $qty,
-                    'subtotal' => $subtotal,
-                    'stock_out_qty' => (int)($item['stock_out_qty'] ?? 0),
-                    'add_time' => $now,
-                ];
-            }
-
-            $freight = (float)($data['freight_amount'] ?? 0);
-            $deposit = (float)($data['deposit_amount'] ?? 0);
-            $payable = array_key_exists('payable_amount', $data)
-                ? (float)$data['payable_amount']
-                : round($product_amount + $freight + $deposit, 2);
+            $freight = round((float)($data['freight_amount'] ?? 0), 2);
+            $payable = round($product_amount + $freight, 2);
             $order_status = (int)($data['order_status'] ?? self::STATUS_PAID);
             if (!in_array($order_status, [self::STATUS_PENDING, self::STATUS_PAID], true)) {
                 throw new ErrorException('新建订单状态只能是待支付或已支付');
             }
 
-            $paid = array_key_exists('paid_amount', $data)
-                ? (float)$data['paid_amount']
-                : ($order_status === self::STATUS_PAID ? $payable : 0);
+            $paid = $order_status === self::STATUS_PAID ? $payable : 0;
 
             $pay_time = null;
             if ($order_status === self::STATUS_PAID) {
@@ -236,7 +215,6 @@ class NewOrderService extends BaseService
                 'expect_return_time' => $this->normalizeDateTime($data['expect_return_time'] ?? null),
                 'product_amount' => $product_amount,
                 'freight_amount' => $freight,
-                'deposit_amount' => $deposit,
                 'payable_amount' => $payable,
                 'paid_amount' => $paid,
                 'points_num' => (int)($data['points_num'] ?? 0),
@@ -260,13 +238,13 @@ class NewOrderService extends BaseService
                 throw new ErrorException('订单创建失败');
             }
             $order_id = (int)$result->getKey();
-            $stock_deducted = $this->stockLockService->occupy(
+            /*$stock_deducted = $this->stockLockService->occupy(
                 NewOrderStockLockService::TYPE_BUY,
                 $order_id,
                 $order_row['order_number'],
                 $normalized_items,
                 $order_status === self::STATUS_PAID
-            );
+            );*/
 
             foreach ($normalized_items as $row) {
                 $row['order_id'] = $order_id;
@@ -281,7 +259,8 @@ class NewOrderService extends BaseService
         } catch (\Exception $e) {
             DB::rollBack();
             if ($stock_deducted) {
-                $this->newProductService->restoreOrderStock($stock_deducted);
+                //屏蔽库存
+                //$this->newProductService->restoreOrderStock($stock_deducted);
             }
             if ($e instanceof ErrorException) {
                 throw $e;
@@ -427,6 +406,137 @@ class NewOrderService extends BaseService
         }
     }
 
+    /**
+     * 明细只收商品ID和数量，名称、单价、规格、小计由商品数据算出。
+     * 库存按 quantity 扣，不再单独写出库数。
+     */
+    private function buildBuyItems(array $items, $now)
+    {
+        $lines = [];
+        $product_ids = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                throw new ErrorException('商品明细格式不正确');
+            }
+            $product_id = (int)($item['product_id'] ?? 0);
+            if ($product_id <= 0) {
+                throw new ErrorException('请填写商品ID');
+            }
+            $qty = (int)($item['quantity'] ?? 0);
+            if ($qty < 1) {
+                throw new ErrorException('请填写商品数量');
+            }
+            $lines[] = [
+                'product_id' => $product_id,
+                'quantity' => $qty,
+            ];
+            $product_ids[$product_id] = $product_id;
+        }
+
+        $products = $this->newProductService->find([
+            ['product_id', 'IN', array_values($product_ids)],
+            ['is_deleted', '=', 0],
+        ]) ?: [];
+        $product_map = [];
+        foreach ($products as $product) {
+            $product_map[(int)$product['product_id']] = $product;
+        }
+
+        $normalized_items = [];
+        $product_amount = 0;
+        foreach ($lines as $line) {
+            $product = $product_map[$line['product_id']] ?? null;
+            if (!$product) {
+                throw new ErrorException('商品不存在');
+            }
+            $name = $product['product_name'] ?? '';
+            if ((int)($product['product_state'] ?? 0) !== NewProductService::PRODUCT_STATE_ON) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】未上架') : '商品未上架');
+            }
+            $sale_mode = (int)($product['sale_mode'] ?? 0);
+            if (!in_array($sale_mode, [NewProductService::SALE_MODE_BUY, NewProductService::SALE_MODE_BUY_RENT], true)) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】不支持购买') : '商品不支持购买');
+            }
+
+            $qty = $line['quantity'];
+            $price = round((float)($product['sale_price'] ?? 0), 2);
+            $subtotal = round($price * $qty, 2);
+            $product_amount += $subtotal;
+            $normalized_items[] = [
+                'product_id' => $line['product_id'],
+                'product_name' => $product['product_name'] ?? '',
+                'product_number' => $product['product_number'] ?? '',
+                'product_image' => $product['product_image'] ?? '',
+                'spec_name' => $this->formatSpecName($product['spec_json'] ?? ''),
+                'unit_price' => $price,
+                'quantity' => $qty,
+                'subtotal' => $subtotal,
+                'add_time' => $now,
+            ];
+        }
+
+        return [
+            'items' => $normalized_items,
+            'product_amount' => round($product_amount, 2),
+        ];
+    }
+
+    /**
+     * 规格 JSON 转订单明细展示文案，最长 100 字。
+     */
+    private function formatSpecName($spec_json)
+    {
+        if ($spec_json === null || $spec_json === '') {
+            return '';
+        }
+        if (is_array($spec_json)) {
+            $decoded = $spec_json;
+        } else {
+            $decoded = json_decode((string)$spec_json, true);
+            if (!is_array($decoded)) {
+                return mb_substr(trim((string)$spec_json), 0, 100);
+            }
+        }
+        if (!$decoded) {
+            return '';
+        }
+
+        $parts = [];
+        $is_list = array_keys($decoded) === range(0, count($decoded) - 1);
+        if ($is_list) {
+            foreach ($decoded as $row) {
+                $text = '';
+                if (is_string($row) || is_numeric($row)) {
+                    $text = trim((string)$row);
+                } elseif (is_array($row)) {
+                    $name = trim((string)($row['name'] ?? $row['spec_name'] ?? $row['label'] ?? ''));
+                    $value = trim((string)($row['value'] ?? $row['spec_value'] ?? $row['spec_item_name'] ?? ''));
+                    if ($name !== '' && $value !== '') {
+                        $text = $name . ':' . $value;
+                    } else {
+                        $text = $value !== '' ? $value : $name;
+                    }
+                }
+                if ($text !== '') {
+                    $parts[] = $text;
+                }
+            }
+        } else {
+            foreach ($decoded as $name => $value) {
+                if (is_array($value)) {
+                    continue;
+                }
+                $value = trim((string)$value);
+                if ($value === '') {
+                    continue;
+                }
+                $parts[] = $name . ':' . $value;
+            }
+        }
+
+        return mb_substr(implode(' ', $parts), 0, 100);
+    }
+
     private function saveAddress($order_id, $address, $now)
     {
         if (is_string($address)) {
@@ -498,6 +608,7 @@ class NewOrderService extends BaseService
             self::STATUS_COMPLETED => '已完成',
             self::STATUS_REFUNDED => '已退款',
             self::STATUS_CLOSED => '已关闭',
+            self::STATUS_PAYING => '支付中',
         ];
         return $map[(int)$status] ?? '';
     }

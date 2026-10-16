@@ -4,6 +4,7 @@ namespace Modules\Trade\Repositories\Criteria;
 
 use Illuminate\Database\Eloquent\Builder;
 use Kuteshop\Core\Repository\Criteria\Criteria;
+use Modules\Account\Repositories\Models\User;
 
 class NewOrderCriteria extends Criteria
 {
@@ -40,12 +41,19 @@ class NewOrderCriteria extends Criteria
             $query->where('order_status', (int)$this->request->get('order_status'));
         }
 
+        if ((int)$this->request->get('only_self', 0) === 1) {
+            $query->where('user_id', (int)User::getUserId());
+        }
+
         $start = $this->request->get('order_time_start', '');
         if ($start !== '' && $start !== null) {
             $query->where('order_time', '>=', $start);
         }
         $end = $this->request->get('order_time_end', '');
         if ($end !== '' && $end !== null) {
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$end)) {
+                $end = $end . ' 23:59:59';
+            }
             $query->where('order_time', '<=', $end);
         }
     }

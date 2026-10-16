@@ -34,4 +34,12 @@ class NewOrderPayController extends BaseController
 
         return Respond::success($data);
     }
+
+    /**
+     * 微信支付 V3 回调，免登录
+     */
+    public function wechatNotify()
+    {
+        return $this->newOrderPayService->wechatNotify();
+    }
 }

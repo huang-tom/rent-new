@@ -39,7 +39,6 @@ class NewProductPromoCateController extends BaseController
             'cate_name' => $request->input('cate_name', ''),
             'cate_desc' => $request->input('cate_desc', ''),
             'cate_type' => (int)$request->input('cate_type', NewProductPromoCateService::CATE_TYPE_CATEGORY),
-            'category_id' => (int)$request->input('category_id', 0),
             'cate_enable' => (int)$request->input('cate_enable', 1),
             'cate_sort' => (int)$request->input('cate_sort', 50),
         ];

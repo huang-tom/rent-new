@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS `pt_new_product` (
   `cycle_type` int NOT NULL DEFAULT 0 COMMENT '周期类型',
   `settle_policy` int NOT NULL DEFAULT 0 COMMENT '到期结算策略',
   `need_tier_price` tinyint NOT NULL DEFAULT 0 COMMENT '是否逐档配置:1是;0否',
+  `rent_period_ids` varchar(255) NOT NULL DEFAULT '' COMMENT '适用租期档位ID，逗号分隔',
+  `renew_period_ids` varchar(255) NOT NULL DEFAULT '' COMMENT '续租租期档位ID，逗号分隔，须为适用档位子集',
   `stock_total` int NOT NULL DEFAULT 0 COMMENT '总库存（仅维护，本期不接业务）',
   `stock_warning` int NOT NULL DEFAULT 0 COMMENT '库存预警阈值（仅维护）',
   `sale_num` int NOT NULL DEFAULT 0 COMMENT '销量（仅维护）',
@@ -69,6 +71,8 @@ CREATE TABLE IF NOT EXISTS `pt_new_product_rent_price` (
 -- 若已按旧版建表，可执行以下增量（按需）：
 -- ALTER TABLE `pt_new_product` ADD COLUMN `product_number` varchar(50) NOT NULL DEFAULT '' COMMENT '商品编号' AFTER `product_name`;
 -- ALTER TABLE `pt_new_product` ADD COLUMN `sale_num` int NOT NULL DEFAULT 0 COMMENT '销量（仅维护）' AFTER `stock_warning`;
+-- ALTER TABLE `pt_new_product` ADD COLUMN `rent_period_ids` varchar(255) NOT NULL DEFAULT '' COMMENT '适用租期档位ID，逗号分隔' AFTER `need_tier_price`;
+-- ALTER TABLE `pt_new_product` ADD COLUMN `renew_period_ids` varchar(255) NOT NULL DEFAULT '' COMMENT '续租租期档位ID，逗号分隔，须为适用档位子集' AFTER `rent_period_ids`;
 -- ALTER TABLE `pt_new_product` ADD COLUMN `audit_status` tinyint NOT NULL DEFAULT 0 COMMENT '审核状态:0待审核;1已通过' AFTER `product_state`;
 -- ALTER TABLE `pt_new_product` MODIFY `product_state` tinyint NOT NULL DEFAULT 0 COMMENT '上下架:1上架;0下架';
 -- ALTER TABLE `pt_new_product` DROP INDEX `idx_category_id`, DROP INDEX `idx_sale_mode`, DROP INDEX `idx_product_state`, DROP INDEX `idx_audit_status`, DROP INDEX `idx_is_deleted`;
@@ -83,6 +87,9 @@ CREATE TABLE IF NOT EXISTS `pt_new_product_rent_price` (
 -- ALTER TABLE `pt_new_product` MODIFY `product_add_time` datetime DEFAULT NULL COMMENT '添加时间', MODIFY `product_update_time` datetime DEFAULT NULL COMMENT '更新时间';
 -- ALTER TABLE `pt_new_product_rent_period` MODIFY `add_time` datetime DEFAULT NULL COMMENT '添加时间', MODIFY `update_time` datetime DEFAULT NULL COMMENT '更新时间';
 -- ALTER TABLE `pt_new_product_promo_cate` MODIFY `add_time` datetime DEFAULT NULL COMMENT '添加时间', MODIFY `update_time` datetime DEFAULT NULL COMMENT '更新时间';
+-- 推广分类关联商品分类改为逗号分隔（已建表时执行）：
+-- ALTER TABLE `pt_new_product_promo_cate` MODIFY `category_id` varchar(255) NOT NULL DEFAULT '' COMMENT '关联商品分类ID，逗号分隔；未维护商品分类的不写入';
+-- UPDATE `pt_new_product_promo_cate` SET `category_id` = '' WHERE `category_id` = '0';
 -- ALTER TABLE `pt_new_product_promo` MODIFY `add_time` datetime DEFAULT NULL COMMENT '添加时间', MODIFY `update_time` datetime DEFAULT NULL COMMENT '更新时间';
 -- ALTER TABLE `pt_new_product_comment` MODIFY `comment_time` datetime DEFAULT NULL COMMENT '评论时间（可指定）', MODIFY `add_time` datetime DEFAULT NULL COMMENT '创建时间', MODIFY `update_time` datetime DEFAULT NULL COMMENT '更新时间';
 -- ALTER TABLE `pt_new_product_comment_reply` MODIFY `reply_time` datetime DEFAULT NULL COMMENT '回复时间（可指定）', MODIFY `add_time` datetime DEFAULT NULL COMMENT '创建时间', MODIFY `update_time` datetime DEFAULT NULL COMMENT '更新时间';
@@ -93,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `pt_new_product_promo_cate` (
   `cate_name` varchar(50) NOT NULL DEFAULT '' COMMENT '分类名称',
   `cate_desc` varchar(255) NOT NULL DEFAULT '' COMMENT '说明',
   `cate_type` tinyint NOT NULL DEFAULT 2 COMMENT '类型:1默认菜单;2分类菜单',
-  `category_id` int unsigned NOT NULL DEFAULT 0 COMMENT '关联商品分类ID，分类菜单可用',
+  `category_id` varchar(255) NOT NULL DEFAULT '' COMMENT '关联商品分类ID，逗号分隔；未维护商品分类的不写入',
   `is_system` tinyint NOT NULL DEFAULT 0 COMMENT '系统内置:1是不可删;0否',
   `cate_enable` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用:1启用;0禁用',
   `cate_sort` int NOT NULL DEFAULT 50 COMMENT '排序，越小越靠前',

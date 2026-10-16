@@ -20,7 +20,7 @@ class NewOrderController extends BaseController
 
     /**
      * 购买订单列表
-     * keyword / order_source / order_status / order_time_start / order_time_end
+     * keyword / order_source / order_status / order_time_start / order_time_end / only_self
      */
     public function list(Request $request)
     {

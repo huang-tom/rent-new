@@ -20,6 +20,8 @@ $router->group(['prefix' => 'front/account', 'middleware' => 'auth'], function (
 });
 
 $router->post('/front/account/login/login', 'LoginController@login');    //用户登录-账号密码登录
+$router->post('/front/account/login/wxPhoneLogin', 'LoginController@wxPhoneLogin'); //小程序手机号登录/注册
+$router->post('/front/account/login/wxOpenidLogin', 'LoginController@wxOpenidLogin'); //小程序openid登录
 $router->get('/front/account/login/doSmsLogin', 'LoginController@doSmsLogin');    //用户登录-手机验证码登录
 $router->post('/front/account/login/register', 'LoginController@register'); //用户注册
 $router->get('/front/account/login/protocol', 'LoginController@protocol'); //协议

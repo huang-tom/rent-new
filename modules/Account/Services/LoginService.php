@@ -30,6 +30,7 @@ class LoginService extends BaseService
     private $userDistributionRepository;
 
     private $userResourceService;
+    private $wechatService;
 
     public function __construct(
         UserRepository             $userRepository,
@@ -40,10 +41,12 @@ class LoginService extends BaseService
         UserAdminRepository        $userAdminRepository,
         UserDistributionRepository $userDistributionRepository,
 
-        UserResourceService        $userResourceService
+        UserResourceService        $userResourceService,
+        WechatService              $wechatService
     )
     {
         $this->userRepository = $userRepository;
+        $this->wechatService = $wechatService;
         $this->userBindConnectRepository = $userBindConnectRepository;
         $this->userInfoRepository = $userInfoRepository;
         $this->userLoginRepository = $userLoginRepository;
@@ -582,6 +585,199 @@ class LoginService extends BaseService
     public function addChannelSourceUserId($user_id, $source_ucc_code)
     {
         return true;
+    }
+
+
+    /**
+     * 小程序 code 换手机号：未注册则注册后登录，已注册则直接登录
+     * openid 为 wxOpenidLogin 未注册时返回的值，绑定到账号
+     * @param $request
+     * @return array
+     * @throws ErrorException
+     */
+    public function wxPhoneLogin($request)
+    {
+        $openid = trim((string)$request->input('openid', ''));
+        if ($openid === '') {
+            throw new ErrorException(__('openid不能为空'));
+        }
+        $openid_user_id = $this->getXcxOpenidUserId($openid);
+
+        $phone = $this->wechatService->getUserPhoneNumber($request->input('code', ''));
+        $dial = $phone['phone_number'];
+        if ($dial === '' || $dial[0] !== '+') {
+            $dial = '+' . $phone['country_code'] . $phone['pure_phone_number'];
+        }
+        if (!PhoneNumberUtils::isValidNumber($dial)) {
+            throw new ErrorException(__('请输入正确的手机号！'));
+        }
+
+        $mobile_info = $this->getMobileCountry($dial);
+        $user_intl = $mobile_info['country_code'];
+        $user_mobile = $mobile_info['mobile'];
+        $bind_id = sprintf('%s%d', $user_intl, $user_mobile);
+        $user_id = $this->findUserIdByMobile($bind_id, $user_intl, $user_mobile, $phone['pure_phone_number']);
+
+        if ($openid_user_id && $openid_user_id !== $user_id) {
+            throw new ErrorException(__('该微信已绑定其他账号'));
+        }
+
+        if (!$user_id) {
+            $request->merge([
+                'bind_type' => BindConnectCode::MOBILE,
+                'user_account' => $bind_id,
+                'user_mobile' => $user_mobile,
+                'user_intl' => $user_intl,
+                'password' => '',
+            ]);
+            $user_id = (int)$this->register($request);
+        }
+
+        if (!$openid_user_id) {
+            $this->bindXcxOpenid($user_id, $openid);
+        }
+
+        $data = $this->issueUserToken($user_id);
+        $data['phone'] = (string)$user_mobile;
+
+        return $data;
+    }
+
+
+    /**
+     * 小程序 openid 登录：wx.login 的 code 换 openid，已绑定账号则登录，未绑定返回 registered=false 和 openid
+     * @param $request
+     * @return array
+     * @throws ErrorException
+     */
+    public function wxOpenidLogin($request)
+    {
+        $session = $this->wechatService->code2Session($request->input('code', ''));
+        $openid = $session['openid'];
+        $user_id = $this->getXcxOpenidUserId($openid);
+        if (!$user_id) {
+            return [
+                'registered' => false,
+                'openid' => $openid,
+                'phone' => '',
+                'token' => '',
+                'user_id' => 0,
+            ];
+        }
+
+        $data = $this->issueUserToken($user_id);
+        $data['registered'] = true;
+        $data['openid'] = $openid;
+
+        return $data;
+    }
+
+
+    /**
+     * 小程序 openid 已绑定的用户ID，未绑定返回 0
+     */
+    private function getXcxOpenidUserId($openid)
+    {
+        $bind_row = $this->userBindConnectRepository->getOne($openid);
+        if (empty($bind_row['user_id']) || empty($bind_row['bind_active'])
+            || (int)$bind_row['bind_type'] !== BindConnectCode::WEIXIN_XCX) {
+            return 0;
+        }
+
+        return (int)$bind_row['user_id'];
+    }
+
+
+    /**
+     * 绑定小程序 openid 到用户
+     * @throws ErrorException
+     */
+    private function bindXcxOpenid($user_id, $openid)
+    {
+        $bind_row = $this->userBindConnectRepository->getOne($openid);
+        if (empty($bind_row)) {
+            $result = $this->userBindConnectRepository->add([
+                'bind_id' => $openid,
+                'bind_type' => BindConnectCode::WEIXIN_XCX,
+                'user_id' => $user_id,
+                'bind_active' => true,
+                'bind_openid' => $openid,
+            ]);
+        } else {
+            $result = $this->userBindConnectRepository->edit($openid, [
+                'bind_type' => BindConnectCode::WEIXIN_XCX,
+                'user_id' => $user_id,
+                'bind_active' => true,
+                'bind_openid' => $openid,
+            ]);
+        }
+
+        if (!$result) {
+            throw new ErrorException(__('绑定微信失败'));
+        }
+    }
+
+
+    /**
+     * 校验账号可用并签发登录 token
+     * @throws ErrorException
+     */
+    private function issueUserToken($user_id)
+    {
+        $user = $this->userRepository->getUser(['user_id' => $user_id]);
+        if (!$user) {
+            throw new ErrorException(__('用户不存在'));
+        }
+        $user_info = $this->userInfoRepository->getOne($user_id);
+        if (empty($user_info) || $user_info['user_state'] == 0) {
+            throw new ErrorException(__('您的账号已被禁用,请联系管理员'));
+        }
+
+        return [
+            //'phone' => (string)($user_info['user_mobile'] ?? ''),
+            'token' => auth()->login($user),
+            'user_id' => (int)$user['user_id'],
+        ];
+    }
+
+
+    /**
+     * 按绑定号、手机号、账号查找已注册用户
+     */
+    private function findUserIdByMobile($bind_id, $user_intl, $user_mobile, $pure_phone)
+    {
+        $bind_ids = array_unique(array_filter([
+            $bind_id,
+            (string)$user_mobile,
+            (string)$pure_phone,
+            ltrim($user_intl, '+') . $user_mobile,
+        ]));
+        foreach ($bind_ids as $id) {
+            $bind_row = $this->userBindConnectRepository->getOne($id);
+            if (!empty($bind_row['user_id'])) {
+                return (int)$bind_row['user_id'];
+            }
+        }
+
+        $user_info = $this->userInfoRepository->findOne([
+            'user_intl' => $user_intl,
+            'user_mobile' => $user_mobile,
+        ]);
+        if (!empty($user_info['user_id'])) {
+            return (int)$user_info['user_id'];
+        }
+
+        foreach ([$bind_id, (string)$user_mobile, (string)$pure_phone] as $account) {
+            if ($account === '') {
+                continue;
+            }
+            $user = $this->userRepository->findOne(['user_account' => $account]);
+            if (!empty($user['user_id'])) {
+                return (int)$user['user_id'];
+            }
+        }
+
+        return 0;
     }
 
 

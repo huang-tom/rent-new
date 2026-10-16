@@ -98,12 +98,16 @@ $router->group(['prefix' => 'manage/trade', 'namespace' => 'Manage', 'middleware
  */
 $router->group(['prefix' => '/front/trade', 'namespace' => 'Manage'], function () use ($router) {
     $router->post('/callback/payNotify', 'NewOrderPayController@payCallback');
+    $router->post('/callback/wechatNotify', 'NewOrderPayController@wechatNotify');
 });
 
 /**
  * Front 请求路径
  */
 $router->group(['prefix' => '/front/trade', 'namespace' => 'Front', 'middleware' => 'auth'], function () use ($router) {
+
+    //新订单微信小程序下单
+    $router->post('/newOrderPay/wechatMiniPay', 'NewOrderPayController@wechatMiniPay');
 
     //订单管理
     $router->post('/order/add', 'OrderController@add');     //添加

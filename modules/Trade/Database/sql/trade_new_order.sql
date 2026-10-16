@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `trade_new_order` (
   `fulfill_warehouse_code` varchar(50) NOT NULL DEFAULT '' COMMENT '履约分仓编码',
   `fulfill_warehouse_name` varchar(100) NOT NULL DEFAULT '' COMMENT '履约仓库名称',
   `user_id` int unsigned NOT NULL DEFAULT 0 COMMENT '登录用户ID(account_user_base)',
-  `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3已完成;4已退款;5已关闭',
+  `order_status` tinyint NOT NULL DEFAULT 0 COMMENT '状态:0待支付;1已支付;2已发货;3已完成;4已退款;5已关闭;6支付中',
   `delivery_type` varchar(50) NOT NULL DEFAULT '' COMMENT '配送方式',
   `express_no` varchar(50) NOT NULL DEFAULT '' COMMENT '快递单号',
   `buyer_message` varchar(500) NOT NULL DEFAULT '' COMMENT '买家留言',
@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS `trade_new_order` (
   `expect_return_time` datetime DEFAULT NULL COMMENT '期望归还时间',
   `product_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '商品金额',
   `freight_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '运费',
-  `deposit_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '押金',
   `payable_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '应付金额',
   `paid_amount` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '实付金额',
   `points_num` int NOT NULL DEFAULT 0 COMMENT '积分数量(占位，不计算)',
@@ -51,9 +50,8 @@ CREATE TABLE IF NOT EXISTS `trade_new_order_item` (
   `product_image` varchar(255) NOT NULL DEFAULT '' COMMENT '商品图',
   `spec_name` varchar(100) NOT NULL DEFAULT '' COMMENT '规格',
   `unit_price` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '单价',
-  `quantity` int NOT NULL DEFAULT 1 COMMENT '数量',
+  `quantity` int NOT NULL DEFAULT 1 COMMENT '数量（购买数，后续扣库存用这个数量）',
   `subtotal` decimal(10,2) NOT NULL DEFAULT 0.00 COMMENT '小计',
-  `stock_out_qty` int NOT NULL DEFAULT 0 COMMENT '出库数',
   `add_time` datetime DEFAULT NULL COMMENT '创建时间',
   PRIMARY KEY (`item_id`),
   KEY `idx_order_id` (`order_id`)
@@ -107,3 +105,8 @@ CREATE TABLE IF NOT EXISTS `trade_new_order_log` (
   PRIMARY KEY (`log_id`),
   KEY `idx_order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='新购买订单操作日志';
+
+-- 已建表时去掉出库数，购买数量即扣库存数量：
+-- ALTER TABLE `trade_new_order_item` DROP COLUMN `stock_out_qty`;
+-- 购买订单无押金：
+-- ALTER TABLE `trade_new_order` DROP COLUMN `deposit_amount`;

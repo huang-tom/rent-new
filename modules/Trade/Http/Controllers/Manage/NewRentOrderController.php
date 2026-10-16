@@ -20,7 +20,7 @@ class NewRentOrderController extends BaseController
 
     /**
      * 租赁订单列表
-     * keyword / order_source / order_status / rent_days / order_time_start / order_time_end
+     * keyword / order_source / order_status / rent_days / order_time_start / order_time_end / only_self
      */
     public function list(Request $request)
     {

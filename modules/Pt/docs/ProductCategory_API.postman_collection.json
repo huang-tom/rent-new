@@ -1,0 +1,326 @@
+{
+  "info": {
+    "_postman_id": "c4d5e6f7-a8b9-0123-cdef-ptcategory001",
+    "name": "商品分类 API",
+    "description": "商品分类接口，数据表 `pt_product_category`。后台维护走 `manage/pt/productCategory`，前台展示走 `front/pt/product`。\n\n---\n\n## 通用说明\n\n| 项 | 说明 |\n|----|------|\n| 后台前缀 | `{{baseUrl}}/manage/pt` |\n| 前台前缀 | `{{baseUrl}}/front/pt` |\n| 后台鉴权 | 需登录且管理员（middleware `auth` + `admin`），Query 传 `api_token` |\n| 前台鉴权 | 分类查询接口无需登录 |\n| 统一响应外壳 | `{ status, code, msg, data }` |\n| 列表分页（转换后） | `items` 列表、`page` 当前页、`records` 总条数、`size` 每页条数、`total` 总页数 |\n| 默认每页 | 未传 `size` 时为 10 |\n| 排序 | `category_sort` 升序，相同则 `category_id` 升序 |\n\n### 统一响应外壳字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| status | int | 成功一般为 200 |\n| code | int | 成功一般为 200 |\n| msg | string | 成功一般为「操作成功」 |\n| data | mixed | 业务数据 |\n\n### 列表分页字段（data 层，仅分页接口）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 当前页数据 |\n| page | int | 当前页码，从 1 开始 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |\n\n### 分类行字段\n\n列表、树节点返回表中的列。接口实际读写的字段如下。`category_is_enable` 模型转为布尔，响应里是 `true` / `false`。\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| category_id | int | 分类 ID |\n| category_name | string | 分类名称，最长 50 |\n| category_parent_id | int | 上级分类 ID，`0` 为一级 |\n| category_image | string | 分类图片 |\n| type_id | int | 商品类型 ID（`pt_product_type`） |\n| category_commission_rate | number | 分佣比例 |\n| category_sort | int | 排序，越小越靠前 |\n| category_is_enable | bool | 是否显示。`true` 显示 / `false` 不显示 |\n\n### 父级筛选 `category_parent_id`\n\n| 传值 | 行为 |\n|------|------|\n| 不传、空、`0` | 不按父级过滤（`0` 会被当成未传） |\n| `-1` | 只查一级分类（库内 `category_parent_id = 0`） |\n| 正整数 | 只查该分类的直接子级 |\n\n### 启用筛选 `category_is_enable`\n\n| 传值 | 行为 |\n|------|------|\n| 不传、空、`0` | 不按启用状态过滤（`0` 会被当成未传） |\n| `1` | 只查启用分类 |\n\n### 集合变量\n\n| 变量 | 说明 |\n|------|------|\n| baseUrl | 如 `http://127.0.0.1:8000` |\n| api_token | 后台登录 Token |\n| category_id | 分类调试 ID |\n| category_parent_id | 上级分类调试 ID |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "api_token", "value": "" },
+    { "key": "category_id", "value": "1" },
+    { "key": "category_parent_id", "value": "0" }
+  ],
+  "item": [
+    {
+      "name": "1. 后台商品分类（productCategory）",
+      "description": "路径前缀：`/manage/pt/productCategory`\n\n需 `api_token`，且为管理员。",
+      "item": [
+        {
+          "name": "分类树",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/tree?api_token={{api_token}}&category_name=&category_is_enable=",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "tree"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token，必填" },
+                { "key": "category_name", "value": "", "description": "分类名称，模糊匹配", "disabled": true },
+                { "key": "category_is_enable", "value": "", "description": "传 1 只查启用；传 0 或不传不筛选", "disabled": true }
+              ]
+            },
+            "description": "## 分类树\n\n`GET /manage/pt/productCategory/tree`\n\n内部固定 `size=9999` 取出列表，再按 `category_parent_id = 0` 组装 `children`。不要用本接口按父级分页；查某一级用列表接口。\n\n若同时传了 `category_parent_id`，结果集里没有一级节点时，树会是空数组。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| category_name | string | 否 | 名称模糊匹配 |\n| category_is_enable | int | 否 | 传 `1` 只查启用；`0` 或不传不筛选 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | array | 一级分类数组，节点含 `children` |\n\n### 返回 data[] 字段\n\n与「分类行字段」相同，并增加：\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| children | array | 子分类，结构与本节点相同；无子级时可能不出现该字段 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": [\n    {\n      \"category_id\": 1,\n      \"category_name\": \"康复辅具\",\n      \"category_parent_id\": 0,\n      \"category_image\": \"\",\n      \"type_id\": 1,\n      \"category_commission_rate\": 0,\n      \"category_sort\": 0,\n      \"category_is_enable\": true,\n      \"children\": [\n        {\n          \"category_id\": 2,\n          \"category_name\": \"轮椅\",\n          \"category_parent_id\": 1,\n          \"category_image\": \"\",\n          \"type_id\": 1,\n          \"category_commission_rate\": 0,\n          \"category_sort\": 0,\n          \"category_is_enable\": true\n        }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "分类列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/list?api_token={{api_token}}&page=1&size=20&category_parent_id=&category_name=&category_is_enable=",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "list"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token，必填" },
+                { "key": "page", "value": "1", "description": "页码，从 1 开始" },
+                { "key": "size", "value": "20", "description": "每页条数，默认 10" },
+                { "key": "category_parent_id", "value": "", "description": "上级分类。-1 查一级；正整数查直接子级；0 或不传不筛选", "disabled": true },
+                { "key": "category_name", "value": "", "description": "分类名称，模糊匹配", "disabled": true },
+                { "key": "category_is_enable", "value": "", "description": "传 1 只查启用；传 0 或不传不筛选", "disabled": true }
+              ]
+            },
+            "description": "## 分类列表\n\n`GET /manage/pt/productCategory/list`\n\n平铺分页，不组树。排序：`category_sort ASC, category_id ASC`。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| page | int | 否 | 当前页，从 1 开始 |\n| size | int | 否 | 每页条数，默认 10 |\n| category_parent_id | int | 否 | `-1` 只查一级；正整数查该分类的直接子级；`0` 或不传不筛选 |\n| category_name | string | 否 | 名称模糊匹配 |\n| category_is_enable | int | 否 | 传 `1` 只查启用；`0` 或不传不筛选 |\n\n### 返回 data（分页外壳）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 分类列表，元素见「分类行字段」 |\n| page | int | 当前页 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"items\": [\n      {\n        \"category_id\": 1,\n        \"category_name\": \"康复辅具\",\n        \"category_parent_id\": 0,\n        \"category_image\": \"\",\n        \"type_id\": 1,\n        \"category_commission_rate\": 0,\n        \"category_sort\": 0,\n        \"category_is_enable\": true\n      }\n    ],\n    \"page\": 1,\n    \"records\": 1,\n    \"size\": 20,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "新增分类",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "category_name", "value": "轮椅", "description": "分类名称，必填，最长 50" },
+                { "key": "category_parent_id", "value": "0", "description": "上级分类 ID，默认 0（一级）" },
+                { "key": "category_image", "value": "", "description": "分类图片 URL，默认空" },
+                { "key": "type_id", "value": "0", "description": "商品类型 ID，默认 0" },
+                { "key": "category_commission_rate", "value": "0", "description": "分佣比例，默认 0" },
+                { "key": "category_sort", "value": "0", "description": "排序，默认 0，越小越靠前" },
+                { "key": "category_is_enable", "value": "1", "description": "是否显示。1/true/on/yes 为显示；不传则为 false" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/add?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "add"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 新增分类\n\n`POST /manage/pt/productCategory/add`\n\n支持 `application/x-www-form-urlencoded` 或 JSON。\n\n未传 `category_is_enable` 时，`boolean()` 结果为 `false`（不显示）。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | Query 鉴权 Token |\n| category_name | string | 是 | 分类名称，最长 50。空则「分类名称不能为空」 |\n| category_parent_id | int | 否 | 上级分类 ID，默认 0 |\n| category_image | string | 否 | 分类图片，默认空 |\n| type_id | int | 否 | 商品类型 ID，默认 0 |\n| category_commission_rate | number | 否 | 分佣比例，默认 0 |\n| category_sort | int | 否 | 排序，默认 0 |\n| category_is_enable | bool | 否 | 是否显示。不传为 `false` |\n\n### 返回 data\n\n新建后的分类行，字段见「分类行字段」。"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"category_id\": 2,\n    \"category_name\": \"轮椅\",\n    \"category_parent_id\": 0,\n    \"category_image\": \"\",\n    \"type_id\": 0,\n    \"category_commission_rate\": 0,\n    \"category_sort\": 0,\n    \"category_is_enable\": true\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "编辑分类",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "category_id", "value": "{{category_id}}", "description": "分类 ID，必填" },
+                { "key": "category_name", "value": "电动轮椅", "description": "分类名称，必填，最长 50" },
+                { "key": "category_parent_id", "value": "{{category_parent_id}}", "description": "上级分类 ID，不传则写成 0" },
+                { "key": "category_image", "value": "", "description": "分类图片，不传则写成空" },
+                { "key": "type_id", "value": "1", "description": "商品类型 ID，不传则写成 0" },
+                { "key": "category_commission_rate", "value": "0", "description": "分佣比例，不传则写成 0" },
+                { "key": "category_sort", "value": "10", "description": "排序，不传则写成 0" },
+                { "key": "category_is_enable", "value": "1", "description": "是否显示。不传则写成 false" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/edit?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "edit"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 编辑分类\n\n`POST /manage/pt/productCategory/edit`\n\n会整组覆盖可写字段。某个字段不传时使用默认值，不是「跳过不改」：\n\n- `category_parent_id` / `type_id` / `category_commission_rate` / `category_sort` 默认 `0`\n- `category_image` 默认空字符串\n- `category_is_enable` 不传则为 `false`\n\n只改启用状态请用「修改启用状态」。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| category_id | int | 是 | 分类 ID |\n| category_name | string | 是 | 分类名称，最长 50 |\n| category_parent_id | int | 否 | 上级分类 ID，不传写成 0 |\n| category_image | string | 否 | 分类图片，不传写成空 |\n| type_id | int | 否 | 商品类型 ID，不传写成 0 |\n| category_commission_rate | number | 否 | 分佣比例，不传写成 0 |\n| category_sort | int | 否 | 排序，不传写成 0 |\n| category_is_enable | bool | 否 | 是否显示，不传写成 false |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | mixed | 更新结果，成功一般为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "删除分类",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "category_id", "value": "{{category_id}}", "description": "分类 ID，必填" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/remove?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "remove"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 删除分类\n\n`POST /manage/pt/productCategory/remove`\n\n物理删除。以下情况拒绝删除：\n\n- 存在子分类：`有 N 个子级商品分类，不可删除`\n- 商品类型引用了该分类：`有 N 个类型使用，不可删除`\n- 品牌引用了该分类：`有 N 个品牌使用，不可删除`\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| category_id | int | 是 | 分类 ID |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | bool | 成功为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "修改启用状态",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "category_id", "value": "{{category_id}}", "description": "分类 ID，必填" },
+                { "key": "category_is_enable", "value": "0", "description": "是否显示。1 显示，0 不显示。不传则报「无修改数据」" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/manage/pt/productCategory/editState?api_token={{api_token}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["manage", "pt", "productCategory", "editState"],
+              "query": [
+                { "key": "api_token", "value": "{{api_token}}", "description": "登录 Token" }
+              ]
+            },
+            "description": "## 修改启用状态\n\n`POST /manage/pt/productCategory/editState`\n\n只更新 `category_is_enable`，不改名称、父级、排序等。\n\n请求里必须带 `category_is_enable`，否则报「无修改数据」。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| api_token | string | 是 | 登录 Token |\n| category_id | int | 是 | 分类 ID |\n| category_is_enable | bool | 是 | `1`/`true` 显示；`0`/`false` 不显示 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | mixed | 更新结果，成功一般为 `true` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": true\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. 前台商品分类（product）",
+      "description": "路径前缀：`/front/pt/product`\n\n无需登录。只收录分类查询，不含商品列表和详情。",
+      "item": [
+        {
+          "name": "一级分类列表",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/front/pt/product/listCategory?page=1&size=20&category_parent_id=&category_name=",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "pt", "product", "listCategory"],
+              "query": [
+                { "key": "page", "value": "1", "description": "页码，从 1 开始" },
+                { "key": "size", "value": "20", "description": "每页条数，默认 10" },
+                { "key": "category_parent_id", "value": "", "description": "不传时接口内部写成 -1，只返回一级分类", "disabled": true },
+                { "key": "category_name", "value": "", "description": "分类名称，模糊匹配", "disabled": true }
+              ]
+            },
+            "description": "## 一级分类列表\n\n`GET /front/pt/product/listCategory`\n\n服务端强制 `category_is_enable = 1`。未传 `category_parent_id` 时写成 `-1`，只返回一级分类。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| page | int | 否 | 当前页 |\n| size | int | 否 | 每页条数，默认 10 |\n| category_parent_id | int | 否 | 不传则只查一级；正整数查该分类的直接子级 |\n| category_name | string | 否 | 名称模糊匹配 |\n\n### 返回 data（分页外壳）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 分类列表，元素见「分类行字段」 |\n| page | int | 当前页 |\n| size | int | 每页条数 |\n| records | int | 总记录数 |\n| total | int | 总页数 |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"items\": [\n      {\n        \"category_id\": 1,\n        \"category_name\": \"康复辅具\",\n        \"category_parent_id\": 0,\n        \"category_image\": \"\",\n        \"type_id\": 1,\n        \"category_commission_rate\": 0,\n        \"category_sort\": 0,\n        \"category_is_enable\": true\n      }\n    ],\n    \"page\": 1,\n    \"records\": 1,\n    \"size\": 20,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "树形分类",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/front/pt/product/treeCategory?category_parent_id=-1&size=9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "pt", "product", "treeCategory"],
+              "query": [
+                { "key": "category_parent_id", "value": "-1", "description": "从哪一级开始。-1 表示一级；不传则不按父级过滤" },
+                { "key": "size", "value": "9999", "description": "每一层的条数上限，默认 10" }
+              ]
+            },
+            "description": "## 树形分类\n\n`GET /front/pt/product/treeCategory`\n\n只返回启用分类。按父级逐层查询后再挂 `children`。\n\n每一层都走分页，未传 `size` 时每层最多 10 条。要拿全部分类请传较大的 `size`。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| category_parent_id | int | 否 | `-1` 从一级开始；正整数从该分类的子级开始；不传或 `0` 不按父级过滤 |\n| size | int | 否 | 每一层条数，默认 10 |\n| category_name | string | 否 | 名称模糊匹配，会作用到每一层查询 |\n\n### 返回 data\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| （本体） | array | 当前层分类，节点含 `children` |\n\n### 返回 data[] 字段\n\n与「分类行字段」相同，并增加 `children`（子分类数组，结构相同）。"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": [\n    {\n      \"category_id\": 1,\n      \"category_name\": \"康复辅具\",\n      \"category_parent_id\": 0,\n      \"category_is_enable\": true,\n      \"children\": [\n        {\n          \"category_id\": 2,\n          \"category_name\": \"轮椅\",\n          \"category_parent_id\": 1,\n          \"category_is_enable\": true,\n          \"children\": []\n        }\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "全部分类",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/front/pt/product/listAllCategory?category_name=&category_is_enable=",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "pt", "product", "listAllCategory"],
+              "query": [
+                { "key": "category_name", "value": "", "description": "分类名称，模糊匹配", "disabled": true },
+                { "key": "category_is_enable", "value": "", "description": "传 1 只查启用；不传则含未启用", "disabled": true }
+              ]
+            },
+            "description": "## 全部分类\n\n`GET /front/pt/product/listAllCategory`\n\n平铺返回，内部 `size=99999`。每条在原字段上额外增加 `id`、`name`、`parent_id`。\n\n本接口不会强制只查启用分类。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| category_parent_id | int | 否 | 同后台列表：`-1` 一级，正整数为直接子级 |\n| category_name | string | 否 | 名称模糊匹配 |\n| category_is_enable | int | 否 | 传 `1` 只查启用；`0` 或不传不筛选 |\n\n### 返回 data（分页外壳）\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| items | array | 分类列表 |\n| page | int | 当前页 |\n| size | int | 每页条数（本接口为 99999） |\n| records | int | 总记录数 |\n| total | int | 总页数 |\n\n### 返回 data.items[] 额外字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| id | int | 同 `category_id` |\n| name | string | 同 `category_name` |\n| parent_id | int | 同 `category_parent_id` |"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"items\": [\n      {\n        \"category_id\": 1,\n        \"category_name\": \"康复辅具\",\n        \"category_parent_id\": 0,\n        \"category_is_enable\": true,\n        \"id\": 1,\n        \"name\": \"康复辅具\",\n        \"parent_id\": 0\n      }\n    ],\n    \"page\": 1,\n    \"records\": 1,\n    \"size\": 99999,\n    \"total\": 1\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "分类筛选项",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/front/pt/product/getSearchFilter?category_id={{category_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["front", "pt", "product", "getSearchFilter"],
+              "query": [
+                { "key": "category_id", "value": "{{category_id}}", "description": "分类 ID。不传或 0 时只返回空的 contracts、markets" }
+              ]
+            },
+            "description": "## 分类筛选项\n\n`GET /front/pt/product/getSearchFilter`\n\n按分类绑定的商品类型，返回上级、下级、辅助属性和品牌，供前台筛选。\n\n`category_id` 为空或分类不存在时，只有 `contracts`、`markets`（目前固定空数组），以及可能出现的 `info`。\n\n属性、品牌来自该分类 `type_id` 对应类型上的 `assist_ids`、`brand_ids`。\n\n### 请求字段\n\n| 字段 | 类型 | 必填 | 说明 |\n|------|------|------|------|\n| category_id | int | 否 | 分类 ID。不传或 `0` 不查分类 |\n\n### 返回 data 字段\n\n| 字段 | 类型 | 说明 |\n|------|------|------|\n| contracts | array | 固定空数组 |\n| markets | array | 固定空数组 |\n| info | object/null | 当前分类行；传入了 category_id 才有 |\n| parent | array | 从当前分类向上的父级（含自身），最多 5 层，当前在前 |\n| children | array | 直接子分类，仅 `category_is_enable = 1` |\n| assists | array | 辅助属性，元素含 `items`（属性值列表） |\n| brands | array | 品牌列表 |\n\n`info`、`parent[]`、`children[]` 为分类行。`assists`、`brands` 为类型上配置的属性与品牌原表字段。"
+          },
+          "response": [
+            {
+              "name": "成功示例",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": 200,\n  \"code\": 200,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    \"contracts\": [],\n    \"markets\": [],\n    \"info\": {\n      \"category_id\": 1,\n      \"category_name\": \"康复辅具\",\n      \"category_parent_id\": 0,\n      \"type_id\": 1,\n      \"category_is_enable\": true\n    },\n    \"parent\": [\n      {\n        \"category_id\": 1,\n        \"category_name\": \"康复辅具\",\n        \"category_parent_id\": 0\n      }\n    ],\n    \"children\": [\n      {\n        \"category_id\": 2,\n        \"category_name\": \"轮椅\",\n        \"category_parent_id\": 1,\n        \"category_is_enable\": true\n      }\n    ],\n    \"assists\": [\n      {\n        \"assist_id\": 1,\n        \"assist_name\": \"颜色\",\n        \"items\": [\n          { \"assist_item_id\": 1, \"assist_id\": 1, \"assist_item_name\": \"黑色\" }\n        ]\n      }\n    ],\n    \"brands\": [\n      { \"brand_id\": 1, \"brand_name\": \"示例品牌\", \"brand_enable\": true }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

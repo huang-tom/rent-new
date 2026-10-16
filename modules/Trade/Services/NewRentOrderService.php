@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Kuteshop\Core\Service\BaseService;
 use Modules\Account\Repositories\Contracts\UserInfoRepository;
 use Modules\Account\Repositories\Models\User;
+use Modules\Pt\Repositories\Contracts\NewProductRentPeriodRepository;
+use Modules\Pt\Repositories\Contracts\NewProductRentPriceRepository;
 use Modules\Pt\Services\NewProductService;
 use Modules\Sys\Services\NumberSeqService;
 use Modules\Trade\Repositories\Contracts\NewRentOrderAddressRepository;
@@ -31,6 +33,8 @@ class NewRentOrderService extends BaseService
     const STATUS_BUYOUT = 5;
     const STATUS_REFUNDED = 6;
     const STATUS_CLOSED = 7;
+    /** 支付中（微信下单后由待支付转入） */
+    const STATUS_PAYING = 8;
 
     const OP_RETURN = 1;
     const OP_RENEW = 2;
@@ -46,6 +50,8 @@ class NewRentOrderService extends BaseService
     private $repairRepository;
     private $numberSeqService;
     private $newProductService;
+    private $rentPeriodRepository;
+    private $rentPriceRepository;
     private $stockLockService;
 
     public function __construct(
@@ -60,6 +66,8 @@ class NewRentOrderService extends BaseService
         NewRentOrderRepairRepository  $repairRepository,
         NumberSeqService              $numberSeqService,
         NewProductService             $newProductService,
+        NewProductRentPeriodRepository $rentPeriodRepository,
+        NewProductRentPriceRepository $rentPriceRepository,
         NewOrderStockLockService      $stockLockService
     )
     {
@@ -74,6 +82,8 @@ class NewRentOrderService extends BaseService
         $this->repairRepository = $repairRepository;
         $this->numberSeqService = $numberSeqService;
         $this->newProductService = $newProductService;
+        $this->rentPeriodRepository = $rentPeriodRepository;
+        $this->rentPriceRepository = $rentPriceRepository;
         $this->stockLockService = $stockLockService;
     }
 
@@ -183,88 +193,23 @@ class NewRentOrderService extends BaseService
         DB::beginTransaction();
         try {
             $user_id = (int)User::getUserId();
-
-            $product_amount = 0;
-            $deposit_total = 0;
+            $built = $this->buildRentItems($items, $now);
+            $normalized_items = $built['items'];
+            $product_amount = $built['product_amount'];
+            $deposit_total = $built['deposit_amount'];
             $discount_total = 0;
-            $rent_days_max = 0;
-            $daily_rent_first = 0;
-            $equipment_price = 0;
-            $normalized_items = [];
+            $rent_days_max = $built['rent_days'];
+            $daily_rent_first = $built['daily_rent'];
+            $equipment_price = $built['equipment_price'];
 
-            foreach ($items as $item) {
-                $qty = max(1, (int)($item['quantity'] ?? 1));
-                $daily = (float)($item['daily_rent'] ?? 0);
-                $days = max(1, (int)($item['rent_days'] ?? 0));
-                $rent_subtotal = isset($item['rent_subtotal'])
-                    ? (float)$item['rent_subtotal']
-                    : round($daily * $days * $qty, 2);
-                $deposit = (float)($item['deposit_amount'] ?? 0);
-                $discount = (float)($item['discount_amount'] ?? 0);
-
-                $product_amount += $rent_subtotal;
-                $deposit_total += $deposit;
-                $discount_total += $discount;
-                if ($days > $rent_days_max) {
-                    $rent_days_max = $days;
-                }
-                if ($daily_rent_first <= 0 && $daily > 0) {
-                    $daily_rent_first = $daily;
-                }
-                $eq = (float)($item['equipment_original_price'] ?? 0);
-                if ($eq > $equipment_price) {
-                    $equipment_price = $eq;
-                }
-
-                $normalized_items[] = [
-                    'product_id' => (int)($item['product_id'] ?? 0),
-                    'product_name' => $item['product_name'] ?? '',
-                    'product_number' => $item['product_number'] ?? '',
-                    'product_image' => $item['product_image'] ?? '',
-                    'spec_name' => $item['spec_name'] ?? '',
-                    'daily_rent' => $daily,
-                    'rent_days' => $days,
-                    'rent_start_date' => $this->normalizeDate($item['rent_start_date'] ?? null),
-                    'rent_end_date' => $this->normalizeDate($item['rent_end_date'] ?? null),
-                    'deposit_amount' => $deposit,
-                    'rent_subtotal' => $rent_subtotal,
-                    'discount_amount' => $discount,
-                    'quantity' => $qty,
-                    'locked_stock_qty' => (int)($item['locked_stock_qty'] ?? $qty),
-                    'device_asset_no' => $item['device_asset_no'] ?? '',
-                    'serial_number' => $item['serial_number'] ?? '',
-                    'equipment_original_price' => $eq,
-                    'add_time' => $now,
-                ];
-            }
-
-            if (array_key_exists('deposit_amount', $data)) {
-                $deposit_total = (float)$data['deposit_amount'];
-            }
-            if (array_key_exists('discount_amount', $data)) {
-                $discount_total = (float)$data['discount_amount'];
-            }
-            if (array_key_exists('rent_days', $data) && (int)$data['rent_days'] > 0) {
-                $rent_days_max = (int)$data['rent_days'];
-            }
-            if (array_key_exists('daily_rent', $data) && (float)$data['daily_rent'] > 0) {
-                $daily_rent_first = (float)$data['daily_rent'];
-            }
-            if (array_key_exists('equipment_original_price', $data)) {
-                $equipment_price = (float)$data['equipment_original_price'];
-            }
-
-            $freight = (float)($data['freight_amount'] ?? 0);
-            $payable = array_key_exists('payable_amount', $data)
-                ? (float)$data['payable_amount']
-                : round($product_amount - $discount_total + $freight + $deposit_total, 2);
+            $freight = round((float)($data['freight_amount'] ?? 0), 2);
+            $payable = round($product_amount - $discount_total + $freight + $deposit_total, 2);
             $order_status = (int)($data['order_status'] ?? self::STATUS_PAID);
-            $paid = array_key_exists('paid_amount', $data)
-                ? (float)$data['paid_amount']
-                : ($order_status === self::STATUS_PENDING ? 0 : $payable);
+            $unpaid = in_array($order_status, [self::STATUS_PENDING, self::STATUS_PAYING], true);
+            $paid = $unpaid ? 0 : $payable;
 
             $pay_time = $this->normalizeDateTime($data['pay_time'] ?? null);
-            if ($order_status === self::STATUS_PENDING) {
+            if ($unpaid) {
                 $pay_time = null;
             } elseif ($pay_time === null && $order_status !== self::STATUS_REFUNDED && $order_status !== self::STATUS_CLOSED) {
                 $pay_time = $now;
@@ -329,7 +274,7 @@ class NewRentOrderService extends BaseService
                 throw new ErrorException('订单创建失败');
             }
             $order_id = (int)$result->getKey();
-            if (in_array($order_status, [self::STATUS_PENDING, self::STATUS_PAID], true)) {
+            /*if (in_array($order_status, [self::STATUS_PENDING, self::STATUS_PAID], true)) {
                 $stock_deducted = $this->stockLockService->occupy(
                     NewOrderStockLockService::TYPE_RENT,
                     $order_id,
@@ -337,7 +282,7 @@ class NewRentOrderService extends BaseService
                     $normalized_items,
                     $order_status === self::STATUS_PAID
                 );
-            }
+            }*/
 
             foreach ($normalized_items as $row) {
                 $row['order_id'] = $order_id;
@@ -357,7 +302,7 @@ class NewRentOrderService extends BaseService
         } catch (\Exception $e) {
             DB::rollBack();
             if ($stock_deducted) {
-                $this->newProductService->restoreOrderStock($stock_deducted);
+                //$this->newProductService->restoreOrderStock($stock_deducted);
             }
             if ($e instanceof ErrorException) {
                 throw $e;
@@ -506,8 +451,8 @@ class NewRentOrderService extends BaseService
         }
 
         $item = $items[0];
-        $rent_days = max(1, (int)($item['rent_days'] ?? $order['rent_days'] ?? 1));
-        $daily = (float)($item['daily_rent'] ?? $order['daily_rent'] ?? 0);
+        $rent_days = max(1, (int)($order['rent_days'] ?? 1));
+        $daily = (float)($order['daily_rent'] ?? 0);
         $deposit = (float)($order['deposit_amount'] ?? 0);
         $product_amount = (float)($order['product_amount'] ?? 0);
         $discount = (float)($order['discount_amount'] ?? 0);
@@ -613,26 +558,16 @@ class NewRentOrderService extends BaseService
         }
 
         $daily = (float)($order['daily_rent'] ?? 0);
-        if ($daily <= 0) {
-            $daily = (float)($items[0]['daily_rent'] ?? 0);
-        }
         $renew_rent = round($daily * $renew_days, 2);
         $new_rent_days = (int)($order['rent_days'] ?? 0) + $renew_days;
 
         $now = getDateTime();
         DB::beginTransaction();
         try {
-            foreach ($items as $item) {
-                $end = $this->normalizeDate($item['rent_end_date'] ?? null);
-                $new_end = $end
-                    ? date('Y-m-d', strtotime($end . ' +' . $renew_days . ' days'))
-                    : null;
-                $this->itemRepository->edit($item['item_id'], [
-                    'rent_days' => (int)($item['rent_days'] ?? 0) + $renew_days,
-                    'rent_end_date' => $new_end,
-                    'rent_subtotal' => round((float)($item['rent_subtotal'] ?? 0) + $renew_rent, 2),
-                ]);
-            }
+            $first = $items[0];
+            $this->itemRepository->edit($first['item_id'], [
+                'rent_subtotal' => round((float)($first['rent_subtotal'] ?? 0) + $renew_rent, 2),
+            ]);
 
             $expect_return = $this->normalizeDateTime($order['expect_return_time'] ?? null);
             $new_expect = $expect_return
@@ -787,6 +722,204 @@ class NewRentOrderService extends BaseService
         return $row;
     }
 
+    /**
+     * 明细只收商品ID、数量、租期档位。名称、租金、押金、设备售价从商品和租期档案计算。
+     * 库存按 quantity 扣，不另存锁定数量。起租日、到期日暂不写。
+     */
+    private function buildRentItems(array $items, $now)
+    {
+        $lines = [];
+        $product_ids = [];
+        $period_ids = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                throw new ErrorException('商品明细格式不正确');
+            }
+            $product_id = (int)($item['product_id'] ?? 0);
+            $period_id = (int)($item['period_id'] ?? 0);
+            $qty = (int)($item['quantity'] ?? 0);
+            if ($product_id <= 0) {
+                throw new ErrorException('请填写商品ID');
+            }
+            if ($period_id <= 0) {
+                throw new ErrorException('请选择租期');
+            }
+            if ($qty < 1) {
+                throw new ErrorException('请填写商品数量');
+            }
+            $lines[] = [
+                'product_id' => $product_id,
+                'period_id' => $period_id,
+                'quantity' => $qty,
+            ];
+            $product_ids[$product_id] = $product_id;
+            $period_ids[$period_id] = $period_id;
+        }
+
+        $products = $this->newProductService->find([
+            ['product_id', 'IN', array_values($product_ids)],
+            ['is_deleted', '=', 0],
+        ]) ?: [];
+        $product_map = [];
+        foreach ($products as $product) {
+            $product_map[(int)$product['product_id']] = $product;
+        }
+
+        $periods = $this->rentPeriodRepository->find([
+            ['period_id', 'IN', array_values($period_ids)],
+            ['is_deleted', '=', 0],
+        ]) ?: [];
+        $period_map = [];
+        foreach ($periods as $period) {
+            $period_map[(int)$period['period_id']] = $period;
+        }
+
+        $prices = $this->rentPriceRepository->find([
+            ['product_id', 'IN', array_values($product_ids)],
+        ]) ?: [];
+        $price_map = [];
+        foreach ($prices as $price) {
+            $price_map[(int)$price['product_id']][(int)$price['period_id']] = $price;
+        }
+
+        $normalized_items = [];
+        $product_amount = 0;
+        $deposit_amount = 0;
+        $rent_days = 0;
+        $daily_rent = 0;
+        $equipment_price = 0;
+        foreach ($lines as $line) {
+            $product = $product_map[$line['product_id']] ?? null;
+            if (!$product) {
+                throw new ErrorException('商品不存在');
+            }
+            $name = $product['product_name'] ?? '';
+            if ((int)($product['product_state'] ?? 0) !== NewProductService::PRODUCT_STATE_ON) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】未上架') : '商品未上架');
+            }
+            $sale_mode = (int)($product['sale_mode'] ?? 0);
+            if (!in_array($sale_mode, [NewProductService::SALE_MODE_RENT, NewProductService::SALE_MODE_BUY_RENT], true)) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】不支持租赁') : '商品不支持租赁');
+            }
+
+            $period = $period_map[$line['period_id']] ?? null;
+            if (!$period || (int)($period['period_enable'] ?? 0) !== 1) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】租期不可用') : '租期不可用');
+            }
+            $allowed = array_filter(array_map('intval', explode(',', (string)($product['rent_period_ids'] ?? ''))));
+            if (!in_array($line['period_id'], $allowed, true)) {
+                throw new ErrorException($name !== '' ? ('商品【' . $name . '】未配置该租期') : '商品未配置该租期');
+            }
+
+            $period_days = max(1, (int)($period['period_days'] ?? 0));
+            $tier = $price_map[$line['product_id']][$line['period_id']] ?? null;
+            if ($tier) {
+                $daily = round((float)($tier['daily_rent'] ?? 0), 2);
+                $total = round((float)($tier['total_rent'] ?? 0), 2);
+                if ($total <= 0) {
+                    $total = round($daily * $period_days, 2);
+                }
+            } else {
+                $daily = round((float)($product['daily_rent'] ?? 0), 2);
+                $total = round($daily * $period_days, 2);
+            }
+
+            $qty = $line['quantity'];
+            $subtotal = round($total * $qty, 2);
+            $deposit = round((float)($product['deposit'] ?? 0) * $qty, 2);
+            $sale_price = round((float)($product['sale_price'] ?? 0), 2);
+            $product_amount += $subtotal;
+            $deposit_amount += $deposit;
+            $equipment_price += round($sale_price * $qty, 2);
+            if ($period_days > $rent_days) {
+                $rent_days = $period_days;
+            }
+            if ($daily_rent <= 0 && $daily > 0) {
+                $daily_rent = $daily;
+            }
+
+            $normalized_items[] = [
+                'product_id' => $line['product_id'],
+                'product_name' => $name,
+                'product_number' => $product['product_number'] ?? '',
+                'product_image' => $product['product_image'] ?? '',
+                'spec_name' => $this->formatSpecName($product['spec_json'] ?? ''),
+                'period_id' => $line['period_id'],
+                'period_name' => $period['period_name'] ?? '',
+                'sale_price' => $sale_price,
+                'deposit_amount' => $deposit,
+                'rent_subtotal' => $subtotal,
+                'discount_amount' => 0,
+                'quantity' => $qty,
+                'device_asset_no' => '',
+                'serial_number' => '',
+                'add_time' => $now,
+            ];
+        }
+
+        return [
+            'items' => $normalized_items,
+            'product_amount' => round($product_amount, 2),
+            'deposit_amount' => round($deposit_amount, 2),
+            'rent_days' => $rent_days,
+            'daily_rent' => $daily_rent,
+            'equipment_price' => round($equipment_price, 2),
+        ];
+    }
+
+    private function formatSpecName($spec_json)
+    {
+        if ($spec_json === null || $spec_json === '') {
+            return '';
+        }
+        if (is_array($spec_json)) {
+            $decoded = $spec_json;
+        } else {
+            $decoded = json_decode((string)$spec_json, true);
+            if (!is_array($decoded)) {
+                return mb_substr(trim((string)$spec_json), 0, 100);
+            }
+        }
+        if (!$decoded) {
+            return '';
+        }
+
+        $parts = [];
+        $is_list = array_keys($decoded) === range(0, count($decoded) - 1);
+        if ($is_list) {
+            foreach ($decoded as $row) {
+                $text = '';
+                if (is_string($row) || is_numeric($row)) {
+                    $text = trim((string)$row);
+                } elseif (is_array($row)) {
+                    $label = trim((string)($row['name'] ?? $row['spec_name'] ?? $row['label'] ?? ''));
+                    $value = trim((string)($row['value'] ?? $row['spec_value'] ?? $row['spec_item_name'] ?? ''));
+                    if ($label !== '' && $value !== '') {
+                        $text = $label . ':' . $value;
+                    } else {
+                        $text = $value !== '' ? $value : $label;
+                    }
+                }
+                if ($text !== '') {
+                    $parts[] = $text;
+                }
+            }
+        } else {
+            foreach ($decoded as $label => $value) {
+                if (is_array($value)) {
+                    continue;
+                }
+                $value = trim((string)$value);
+                if ($value === '') {
+                    continue;
+                }
+                $parts[] = $label . ':' . $value;
+            }
+        }
+
+        return mb_substr(implode(' ', $parts), 0, 100);
+    }
+
     private function saveAddress($order_id, $address, $now)
     {
         if (is_string($address)) {
@@ -869,6 +1002,7 @@ class NewRentOrderService extends BaseService
             self::STATUS_BUYOUT => '已买断',
             self::STATUS_REFUNDED => '已退款',
             self::STATUS_CLOSED => '已关闭',
+            self::STATUS_PAYING => '支付中',
         ];
         return $map[(int)$status] ?? '';
     }
